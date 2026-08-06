@@ -192,7 +192,7 @@ export default function JobsPage({
       </div>
       {!canWrite && (
         <div className="mb-3 rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-1.5 text-xs text-slate-400">
-          👁 View-only — you have viewer access to this workspace.
+          View-only. you have viewer access to this workspace.
         </div>
       )}
 
@@ -215,7 +215,7 @@ export default function JobsPage({
         {range === "custom" && (
           <span className="flex items-center gap-1">
             <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
-            <span className="text-slate-500">→</span>
+            <span className="text-slate-500">to</span>
             <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
           </span>
         )}
@@ -244,7 +244,6 @@ export default function JobsPage({
       <div className="flex-1 space-y-2 overflow-auto pb-24">
         {filtered.length === 0 ? (
           <div className="mt-16 text-center text-slate-500">
-            <p className="text-4xl">🗂️</p>
             <p className="mt-3">
               {jobs.length === 0
                 ? "No applications yet. Add your first one."
@@ -272,7 +271,7 @@ export default function JobsPage({
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.96 }}
           onClick={() => setModal({})}
-          className="absolute bottom-6 right-6 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-900/40 hover:bg-indigo-500"
+          className="absolute bottom-6 right-6 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg  hover:bg-indigo-500"
         >
           + New application
         </motion.button>

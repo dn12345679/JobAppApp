@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { JobApplication } from "../../types";
 import { listJobs } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
@@ -98,6 +99,20 @@ export default function CalendarPage({
           </NavBtn>
           <NavBtn onClick={() => shift(1)}>›</NavBtn>
         </div>
+      </div>
+
+      {/* Legend */}
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Deadline
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Interview
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded border border-indigo-500 bg-indigo-500/10" />{" "}
+          Today
+        </span>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-6">
@@ -267,9 +282,12 @@ function DayPopup({
                 {ev.job.link && (
                   <>
                     {" · "}
-                    <a href={ev.job.link} target="_blank" className="text-indigo-400 hover:underline">
+                    <button
+                      onClick={() => openUrl(ev.job.link!)}
+                      className="text-indigo-400 hover:underline"
+                    >
                       link
-                    </a>
+                    </button>
                   </>
                 )}
               </div>

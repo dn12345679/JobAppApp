@@ -36,7 +36,7 @@ export default function AccountMenu({
             <span className="max-w-[10rem] truncate">{user.email}</span>
           </>
         ) : (
-          <span>⚙</span>
+          <span></span>
         )}
       </button>
       <AnimatePresence>

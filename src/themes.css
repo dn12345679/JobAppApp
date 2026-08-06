@@ -32,6 +32,25 @@
   --accent-hover: #6366f1;
   --accent-2: #818cf8;
   --accent-1: #a5b4fc;
+
+  /* Status hues — used by state/flag/stage badges and chart tiles across ALL
+     themes (they inherit these unless a theme overrides them below). Defaults
+     are the standard Tailwind colors, so the current look is unchanged. */
+  --emerald-300: #6ee7b7;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --amber-200: #fde68a;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --rose-300: #fda4af;
+  --rose-400: #fb7185;
+  --rose-500: #f43f5e;
+  --rose-600: #e11d48;
+  --rose-950: #4c0519;
+  --sky-300: #7dd3fc;
+  --fuchsia-300: #f0abfc;
+  --teal-300: #5eead4;
 }
 
 /* Menu: "Ocean" · THEMES id "ocean" (must match the button in src/lib/theme.ts). */
@@ -86,4 +105,46 @@
   --accent-hover: #4338ca;
   --accent-2: #6366f1;
   --accent-1: #4f46e5;
+}
+
+/* Menu: "Butter" - Themes id "butter" */
+
+:root[data-theme="butter"] {
+  color-scheme: light;
+  --bg: #ffefc4;
+  --surface-2: #faecc8;
+  
+  --surface: #fdeab7;
+  --line: #f2dfb0;
+  --field: #faffde07;
+  
+  --dim: #736d3f;
+  --muted: #b7af93;
+  
+  --ink-2: #525533;
+  --ink: #433c1b;
+
+  --accent: #dbba50; 
+  --accent-hover: #c8a73c;
+  
+  --accent-2: #faae68;
+  --accent-1: #020202;
+}
+
+/* Menu: "Sakura" · THEMES id "sakura" (soft cherry-blossom light theme). */
+:root[data-theme="sakura"] {
+  color-scheme: light;
+  --bg: #fdf1f5; /* blossom-pink page */
+  --surface-2: #fbe6ee; /* light pink panels */
+  --surface: #ffffff; /* white cards */
+  --line: #f4cfdc; /* soft pink borders */
+  --field: #e7b1c4; /* input borders */
+  --dim: #bd93a2; /* faint mauve */
+  --muted: #9a7280; /* muted mauve */
+  --ink-2: #6d4655; /* secondary plum */
+  --ink: #45262f; /* primary dark plum */
+  --accent: #db4f8a; /* cherry rose (white text reads on it) */
+  --accent-hover: #c43f78;
+  --accent-2: #e781aa; /* mid pink */
+  --accent-1: #bd3d70; /* darker rose for readable colored text */
 }

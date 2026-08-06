@@ -21,6 +21,23 @@
   --color-indigo-400: var(--accent-2);
   --color-indigo-300: var(--accent-1);
   --color-indigo-200: var(--accent-1);
+
+  /* Status hues (badges, flags, chart tiles) — values live in themes.css. */
+  --color-emerald-300: var(--emerald-300);
+  --color-emerald-400: var(--emerald-400);
+  --color-emerald-500: var(--emerald-500);
+  --color-amber-200: var(--amber-200);
+  --color-amber-300: var(--amber-300);
+  --color-amber-400: var(--amber-400);
+  --color-amber-500: var(--amber-500);
+  --color-rose-300: var(--rose-300);
+  --color-rose-400: var(--rose-400);
+  --color-rose-500: var(--rose-500);
+  --color-rose-600: var(--rose-600);
+  --color-rose-950: var(--rose-950);
+  --color-sky-300: var(--sky-300);
+  --color-fuchsia-300: var(--fuchsia-300);
+  --color-teal-300: var(--teal-300);
 }
 
 html,

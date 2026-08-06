@@ -10,6 +10,7 @@ import type {
 import { createJob, updateJob } from "../lib/db";
 import {
   AUTH_OPTIONS,
+  FLAG_DOT,
   FLAG_OPTIONS,
   STATE_OPTIONS,
   isInterviewStage,
@@ -182,6 +183,8 @@ export default function JobFormModal({
                 ))}
               </select>
             </Field>
+
+            
             {state === "Applied" && (
               <Field label="Stage">
                 <select value={stage} onChange={(e) => setStage(e.target.value)} className={inputCls}>
@@ -206,12 +209,18 @@ export default function JobFormModal({
 
           {state === "NotApplied" && (
             <Field label="Flag">
-              <select value={flag} onChange={(e) => setFlag(e.target.value as Flag | "")} className={inputCls}>
-                <option value="">None</option>
+              <div className="flex flex-wrap gap-2">
+                <FlagPill selected={flag === ""} onClick={() => setFlag("")} label="None" />
                 {FLAG_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <FlagPill
+                    key={o.value}
+                    selected={flag === o.value}
+                    onClick={() => setFlag(o.value)}
+                    dot={FLAG_DOT[o.value]}
+                    label={o.label}
+                  />
                 ))}
-              </select>
+              </div>
             </Field>
           )}
 
@@ -246,7 +255,7 @@ export default function JobFormModal({
           </div>
           {auth === "has_login" && (
             <p className="-mt-1 text-xs text-amber-400/80">
-              Passwords aren't stored (DESIGN.md §7) — keep them in a password manager.
+              Passwords won't be stored on the Database
             </p>
           )}
 
@@ -366,6 +375,37 @@ function Segmented<T extends string>({
 
 const inputCls =
   "w-full rounded-lg border border-slate-600 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500";
+
+function FlagPill({
+  selected,
+  onClick,
+  dot,
+  label,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  dot?: string;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+        selected
+          ? "border-indigo-500 bg-indigo-500/10 text-slate-100"
+          : "border-slate-600 text-slate-300 hover:border-slate-500"
+      }`}
+    >
+      <span
+        className={`h-2.5 w-2.5 rounded-full ${
+          dot ?? "border border-slate-500"
+        }`}
+      />
+      {label}
+    </button>
+  );
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

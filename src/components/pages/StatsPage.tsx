@@ -54,35 +54,45 @@ export default function StatsPage({
   const weekday = useMemo(() => weekdayData(jobs), [jobs]);
   const sankey = useMemo(() => buildSankey(c), [c]);
 
-  const tiles = [
+  const stateTiles = [
     { label: "Total", value: jobs.length, accent: "text-slate-100" },
     { label: "Not applied", value: c.notApplied, accent: "text-slate-300" },
     { label: "In progress", value: c.inProgress, accent: "text-amber-300" },
     { label: "Applied", value: c.applied, accent: "text-emerald-300" },
-    ...Object.entries(c.stages).map(([label, value], i) => ({
-      label,
-      value,
-      accent: STAGE_ACCENTS[i % STAGE_ACCENTS.length],
-    })),
   ];
+  const stageTiles = Object.entries(c.stages).map(([label, value], i) => ({
+    label,
+    value,
+    accent: STAGE_ACCENTS[i % STAGE_ACCENTS.length],
+  }));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* Count tiles */}
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-3 md:grid-cols-5">
-        {tiles.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.03 }}
-            className="rounded-2xl border border-slate-800 bg-slate-800/40 p-4"
-          >
-            <div className={`text-3xl font-semibold ${s.accent}`}>{s.value}</div>
-            <div className="mt-1 text-xs text-slate-500">{s.label}</div>
-          </motion.div>
-        ))}
+      {/* State tiles */}
+      <div>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+          States
+        </h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stateTiles.map((s, i) => (
+            <Tile key={s.label} tile={s} delay={i * 0.03} />
+          ))}
+        </div>
       </div>
+
+      {/* Stage tiles (breakdown of Applied) */}
+      {stageTiles.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Applied · stages
+          </h3>
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+            {stageTiles.map((s, i) => (
+              <Tile key={s.label} tile={s} delay={i * 0.03} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {jobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-800 p-10 text-center text-slate-600">
@@ -137,9 +147,11 @@ export default function StatsPage({
               <ResponsiveContainer width="100%" height={280}>
                 <Sankey
                   data={sankey}
-                  nodePadding={24}
-                  margin={{ left: 8, right: 120, top: 8, bottom: 8 }}
-                  link={{ stroke: "var(--accent)", strokeOpacity: 0.3 }}
+                  nodeWidth={14}
+                  nodePadding={26}
+                  iterations={64}
+                  margin={{ left: 8, right: 120, top: 12, bottom: 12 }}
+                  link={<SankeyLink />}
                   node={<SankeyNode />}
                 >
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
@@ -185,6 +197,38 @@ function SankeyNode(props: any) {
         <tspan fill="var(--muted)"> · {payload.value}</tspan>
       </text>
     </Layer>
+  );
+}
+
+// Render links as filled ribbons (a thick *stroked* curve pinches inward at the
+// bend; a filled area between two bezier edges stays clean).
+function SankeyLink(props: any) {
+  const {
+    sourceX,
+    sourceY,
+    sourceControlX,
+    targetControlX,
+    targetX,
+    targetY,
+    linkWidth,
+    index,
+  } = props;
+  const half = Math.max(linkWidth, 1) / 2;
+  const d = [
+    `M${sourceX},${sourceY - half}`,
+    `C${sourceControlX},${sourceY - half} ${targetControlX},${targetY - half} ${targetX},${targetY - half}`,
+    `L${targetX},${targetY + half}`,
+    `C${targetControlX},${targetY + half} ${sourceControlX},${sourceY + half} ${sourceX},${sourceY + half}`,
+    "Z",
+  ].join(" ");
+  return (
+    <path
+      key={`link-${index}`}
+      d={d}
+      fill="var(--accent)"
+      fillOpacity={0.28}
+      stroke="none"
+    />
   );
 }
 
@@ -271,6 +315,26 @@ function buildSankey(c: Counts) {
 }
 
 // ---- small presentational helpers -------------------------------------------
+
+function Tile({
+  tile,
+  delay,
+}: {
+  tile: { label: string; value: number; accent: string };
+  delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className="rounded-2xl border border-slate-800 bg-slate-800/40 p-4"
+    >
+      <div className={`text-3xl font-semibold ${tile.accent}`}>{tile.value}</div>
+      <div className="mt-1 text-xs text-slate-500">{tile.label}</div>
+    </motion.div>
+  );
+}
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (

@@ -46,9 +46,8 @@ export default function SignInPage() {
         className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl"
       >
         <div className="mb-6 text-center">
-          <div className="text-4xl">💼</div>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
-            Job Tracker
+            Job Application Tracker
           </h1>
           <p className="mt-1 text-sm text-slate-400">
             {step === "email"

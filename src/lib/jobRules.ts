@@ -12,9 +12,9 @@ export function isInterviewStage(label: string | null): boolean {
 }
 
 export const FLAG_OPTIONS: { value: Flag; label: string }[] = [
-  { value: "red", label: "🔴 Apply now" },
-  { value: "yellow", label: "🟡 Within 1 week" },
-  { value: "green", label: "🟢 Within 1 month" },
+  { value: "red", label: "Apply now" },
+  { value: "yellow", label: "Apply within 1 week" },
+  { value: "green", label: "Apply within 1+ months" },
 ];
 
 export const AUTH_OPTIONS: { value: AuthKind; label: string }[] = [
