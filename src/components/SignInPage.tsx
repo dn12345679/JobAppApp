@@ -98,12 +98,12 @@ export default function SignInPage() {
             }}
             className="mt-3 w-full text-center text-sm text-slate-400 hover:text-slate-200"
           >
-            ← Use a different email
+            Use a different email?
           </button>
         )}
 
         <p className="mt-6 text-center text-xs text-slate-600">
-          We'll email you a one-time code — no password needed.
+          We'll email you a one-time code (check your Spam folder if you dont see it)
         </p>
       </motion.div>
     </div>

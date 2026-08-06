@@ -31,6 +31,7 @@ create table if not exists public.job_applications (
   pay_min             numeric,
   pay_max             numeric,
   pay_median          numeric,
+  hourly              boolean not null default false,
   state               text not null default 'NotApplied',
   stage               text,
   interview_number    integer,
@@ -56,6 +57,17 @@ create table if not exists public.job_applications (
 create index if not exists idx_jobs_workspace on public.job_applications (workspace_id);
 create index if not exists idx_jobs_updated   on public.job_applications (updated_at);
 create index if not exists idx_memberships_ws on public.memberships (workspace_id);
+
+create table if not exists public.stages (
+  id           uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces (id) on delete cascade,
+  label        text not null,
+  position     integer not null default 0,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  deleted      boolean not null default false
+);
+create index if not exists idx_stages_workspace on public.stages (workspace_id);
 
 -- ---------------------------------------------------------------------------
 -- Access helpers (SECURITY DEFINER bypasses RLS to avoid recursive checks)
@@ -128,6 +140,17 @@ create policy jobs_insert on public.job_applications
 create policy jobs_update on public.job_applications
   for update using (public.can_write(workspace_id));
 create policy jobs_delete on public.job_applications
+  for delete using (public.can_write(workspace_id));
+
+-- Stages: members read; editors/owners write.
+alter table public.stages enable row level security;
+create policy stages_select on public.stages
+  for select using (public.is_member(workspace_id));
+create policy stages_insert on public.stages
+  for insert with check (public.can_write(workspace_id));
+create policy stages_update on public.stages
+  for update using (public.can_write(workspace_id));
+create policy stages_delete on public.stages
   for delete using (public.can_write(workspace_id));
 
 -- ---------------------------------------------------------------------------

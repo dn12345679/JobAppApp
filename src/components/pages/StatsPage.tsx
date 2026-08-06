@@ -17,12 +17,24 @@ import type { JobApplication } from "../../types";
 import { listJobs } from "../../lib/db";
 
 const TOOLTIP_STYLE = {
-  background: "#1e293b",
-  border: "1px solid #334155",
+  background: "var(--surface)",
+  border: "1px solid var(--line)",
   borderRadius: 8,
-  color: "#e2e8f0",
+  color: "var(--ink)",
   fontSize: 12,
 };
+
+// Auto-assigned tile colors for custom stages (cycled).
+const STAGE_ACCENTS = [
+  "text-indigo-300",
+  "text-sky-300",
+  "text-emerald-400",
+  "text-rose-400",
+  "text-fuchsia-300",
+  "text-teal-300",
+  "text-amber-300",
+  "text-slate-400",
+];
 
 export default function StatsPage({
   workspaceId,
@@ -47,11 +59,11 @@ export default function StatsPage({
     { label: "Not applied", value: c.notApplied, accent: "text-slate-300" },
     { label: "In progress", value: c.inProgress, accent: "text-amber-300" },
     { label: "Applied", value: c.applied, accent: "text-emerald-300" },
-    { label: "Interviews", value: c.interview, accent: "text-indigo-300" },
-    { label: "In review", value: c.inReview, accent: "text-sky-300" },
-    { label: "Accepted", value: c.accepted, accent: "text-emerald-400" },
-    { label: "Rejected", value: c.rejected, accent: "text-rose-400" },
-    { label: "Declined", value: c.declined, accent: "text-slate-400" },
+    ...Object.entries(c.stages).map(([label, value], i) => ({
+      label,
+      value,
+      accent: STAGE_ACCENTS[i % STAGE_ACCENTS.length],
+    })),
   ];
 
   return (
@@ -106,15 +118,15 @@ export default function StatsPage({
                 <BarChart data={weekday}>
                   <XAxis
                     dataKey="day"
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                    axisLine={{ stroke: "#334155" }}
+                    tick={{ fill: "var(--muted)", fontSize: 12 }}
+                    axisLine={{ stroke: "var(--line)" }}
                     tickLine={false}
                   />
                   <Tooltip
                     contentStyle={TOOLTIP_STYLE}
-                    cursor={{ fill: "#33415533" }}
+                    cursor={{ fill: "var(--line)", fillOpacity: 0.25 }}
                   />
-                  <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </Card>
@@ -127,7 +139,7 @@ export default function StatsPage({
                   data={sankey}
                   nodePadding={24}
                   margin={{ left: 8, right: 120, top: 8, bottom: 8 }}
-                  link={{ stroke: "#6366f1", strokeOpacity: 0.25 }}
+                  link={{ stroke: "var(--accent)", strokeOpacity: 0.3 }}
                   node={<SankeyNode />}
                 >
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
@@ -157,7 +169,7 @@ function SankeyNode(props: any) {
         y={y}
         width={width}
         height={height}
-        fill="#818cf8"
+        fill="var(--accent-2)"
         fillOpacity={0.9}
         radius={2}
       />
@@ -167,10 +179,10 @@ function SankeyNode(props: any) {
         textAnchor={isRight ? "end" : "start"}
         dominantBaseline="middle"
         fontSize={12}
-        fill="#cbd5e1"
+        fill="var(--ink-2)"
       >
         {payload.name}
-        <tspan fill="#64748b"> · {payload.value}</tspan>
+        <tspan fill="var(--muted)"> · {payload.value}</tspan>
       </text>
     </Layer>
   );
@@ -182,25 +194,20 @@ interface Counts {
   notApplied: number;
   inProgress: number;
   applied: number;
-  inReview: number;
-  interview: number;
-  rejected: number;
-  accepted: number;
-  declined: number;
+  stages: Record<string, number>; // count per (custom) stage label, applied jobs
 }
 
 function counts(jobs: JobApplication[]): Counts {
   const applied = jobs.filter((j) => j.state === "Applied");
-  const byStage = (s: string) => applied.filter((j) => j.stage === s).length;
+  const stages: Record<string, number> = {};
+  for (const j of applied) {
+    if (j.stage) stages[j.stage] = (stages[j.stage] ?? 0) + 1;
+  }
   return {
     notApplied: jobs.filter((j) => j.state === "NotApplied").length,
     inProgress: jobs.filter((j) => j.state === "InProgress").length,
     applied: applied.length,
-    inReview: byStage("InReview"),
-    interview: byStage("Interview"),
-    rejected: byStage("Rejected"),
-    accepted: byStage("Accepted"),
-    declined: byStage("Declined"),
+    stages,
   };
 }
 
@@ -238,11 +245,9 @@ function buildSankey(c: Counts) {
       ["Applications", "Not applied", c.notApplied],
       ["Applications", "In progress", c.inProgress],
       ["Applications", "Applied", c.applied],
-      ["Applied", "In review", c.inReview],
-      ["Applied", "Interview", c.interview],
-      ["Applied", "Rejected", c.rejected],
-      ["Applied", "Accepted", c.accepted],
-      ["Applied", "Declined", c.declined],
+      ...Object.entries(c.stages).map(
+        ([label, count]): [string, string, number] => ["Applied", label, count],
+      ),
     ] as [string, string, number][]
   ).filter(([, , v]) => v > 0);
 

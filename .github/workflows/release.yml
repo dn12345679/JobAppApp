@@ -1,0 +1,57 @@
+name: Release
+
+# Publishes signed installers + the updater manifest (latest.json) when you push
+# a version tag, e.g.:  git tag v1.0.1 && git push origin v1.0.1
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: ubuntu-22.04
+          # - platform: macos-latest   # add if you want macOS (needs signing for smooth installs)
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev build-essential curl wget file libssl-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Update signing (from `tauri signer generate`)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Key was generated without a password, so this is intentionally empty.
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # Baked into the build (mirrors your local .env)
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Job Tracker ${{ github.ref_name }}"
+          releaseBody: "Download the installer for your OS below. Existing installs update automatically."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

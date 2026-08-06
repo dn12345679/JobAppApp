@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { ApplicationState, JobApplication } from "../../types";
-import { deleteJob, listJobs } from "../../lib/db";
+import type {
+  ApplicationState,
+  JobApplication,
+  WorkspaceStage,
+} from "../../types";
+import { deleteJob, ensureStages, listJobs, listStages } from "../../lib/db";
 import { fmtDate, fmtPay } from "../../lib/format";
 import {
   FLAG_DOT,
   STATE_LABELS,
   STATE_STYLES,
-  STAGE_LABELS,
+  isInterviewStage,
 } from "../../lib/jobRules";
 import JobFormModal from "../JobFormModal";
 import TrashModal from "../TrashModal";
+import StagesModal from "../StagesModal";
 import { exportJobs, type ExportFormat } from "../../lib/export";
 
 type DateRange = "all" | "week" | "month" | "custom";
@@ -38,13 +43,19 @@ export default function JobsPage({
   const [modal, setModal] = useState<null | { job?: JobApplication }>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showStages, setShowStages] = useState(false);
+  const [stages, setStages] = useState<WorkspaceStage[]>([]);
 
   async function refresh() {
     setJobs(await listJobs(workspaceId));
+    setStages(await listStages(workspaceId));
   }
 
   useEffect(() => {
-    refresh();
+    (async () => {
+      if (canWrite) await ensureStages(workspaceId); // seed defaults if empty
+      await refresh();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, refreshKey]);
 
@@ -162,6 +173,15 @@ export default function JobsPage({
         </div>
         {canWrite && (
           <button
+            onClick={() => setShowStages(true)}
+            title="Manage stages"
+            className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-400 hover:text-slate-200"
+          >
+            Stages
+          </button>
+        )}
+        {canWrite && (
+          <button
             onClick={() => setShowTrash(true)}
             title="Trash"
             className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-400 hover:text-slate-200"
@@ -263,11 +283,19 @@ export default function JobsPage({
           <JobFormModal
             workspaceId={workspaceId}
             job={modal.job}
+            stages={stages}
             onClose={() => setModal(null)}
             onSaved={() => {
               setModal(null);
               refresh();
             }}
+          />
+        )}
+        {showStages && (
+          <StagesModal
+            workspaceId={workspaceId}
+            onClose={() => setShowStages(false)}
+            onChanged={refresh}
           />
         )}
         {showTrash && (
@@ -299,9 +327,9 @@ function JobRow({
   const pay = fmtPay(job);
   const stageLabel =
     job.state === "Applied" && job.stage
-      ? job.stage === "Interview" && job.interviewNumber
-        ? `Interview #${job.interviewNumber}`
-        : STAGE_LABELS[job.stage]
+      ? isInterviewStage(job.stage) && job.interviewNumber
+        ? `${job.stage} #${job.interviewNumber}`
+        : job.stage
       : null;
 
   return (

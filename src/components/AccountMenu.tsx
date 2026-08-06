@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../auth/AuthContext";
 import { THEMES, applyTheme, getSavedTheme } from "../lib/theme";
+import { checkForUpdate } from "../lib/updater";
 
 export default function AccountMenu({
   zoom,
@@ -110,19 +111,26 @@ export default function AccountMenu({
                 </div>
               </div>
 
+              <div className="my-1 border-t border-slate-700" />
+              <button
+                onClick={async () => {
+                  setShowMenu(false);
+                  await checkForUpdate();
+                }}
+                className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700"
+              >
+                Check for updates
+              </button>
               {user && (
-                <>
-                  <div className="my-1 border-t border-slate-700" />
-                  <button
-                    onClick={async () => {
-                      setShowMenu(false);
-                      await signOut();
-                    }}
-                    className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700"
-                  >
-                    Sign out
-                  </button>
-                </>
+                <button
+                  onClick={async () => {
+                    setShowMenu(false);
+                    await signOut();
+                  }}
+                  className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700"
+                >
+                  Sign out
+                </button>
               )}
             </motion.div>
           </>

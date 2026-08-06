@@ -32,10 +32,12 @@ export function fmtDateShort(value: string | null): string {
 
 export function fmtPay(job: JobApplication): string | null {
   const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-  if (job.payMedian != null) return `~${usd(job.payMedian)}`;
-  if (job.payMin != null && job.payMax != null)
-    return `${usd(job.payMin)}–${usd(job.payMax)}`;
-  if (job.payMin != null) return `${usd(job.payMin)}+`;
-  if (job.payMax != null) return `up to ${usd(job.payMax)}`;
-  return null;
+  const per = job.hourly ? "/hr" : "/yr";
+  let base: string | null = null;
+  if (job.payMedian != null) base = `~${usd(job.payMedian)}`;
+  else if (job.payMin != null && job.payMax != null)
+    base = `${usd(job.payMin)}–${usd(job.payMax)}`;
+  else if (job.payMin != null) base = `${usd(job.payMin)}+`;
+  else if (job.payMax != null) base = `up to ${usd(job.payMax)}`;
+  return base ? `${base}${per}` : null;
 }

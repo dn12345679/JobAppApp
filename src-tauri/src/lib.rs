@@ -18,12 +18,33 @@ pub fn run() {
             sql: include_str!("../migrations/0002_end_date.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "add hourly",
+            sql: include_str!("../migrations/0003_hourly.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 4,
+            description: "add stages table",
+            sql: include_str!("../migrations/0004_stages.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            // The updater is desktop-only.
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            let _ = app;
+            Ok(())
+        })
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations(DB_URL, migrations)

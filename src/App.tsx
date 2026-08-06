@@ -11,6 +11,7 @@ import {
   listWorkspaces,
 } from "./lib/db";
 import { syncAll } from "./lib/sync";
+import { checkForUpdate } from "./lib/updater";
 import { useAuth } from "./auth/AuthContext";
 import StatsPage from "./components/pages/StatsPage";
 import JobsPage from "./components/pages/JobsPage";
@@ -165,6 +166,11 @@ export default function App() {
       setSyncing(false);
     }
   }
+
+  // Quietly check for an app update on launch.
+  useEffect(() => {
+    void checkForUpdate({ silent: true });
+  }, []);
 
   // Apply + persist UI scale (webviews ignore native Ctrl+ zoom).
   useEffect(() => {

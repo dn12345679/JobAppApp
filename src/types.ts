@@ -4,13 +4,8 @@ export type Role = "owner" | "editor" | "viewer";
 
 export type ApplicationState = "NotApplied" | "InProgress" | "Applied";
 
-export type ApplicationStage =
-  | "InReview"
-  | "Interview"
-  | "Rejected"
-  | "Accepted"
-  | "Declined";
-
+// Stage is a per-workspace, user-editable label (see WorkspaceStage), so on a
+// job it's just a free string.
 export type AuthKind = "none" | "sso_google" | "has_login";
 
 export type Flag = "red" | "yellow" | "green";
@@ -30,6 +25,14 @@ export interface Membership {
   createdAt: string;
 }
 
+/** A user-defined application stage, scoped to a workspace and ordered. */
+export interface WorkspaceStage {
+  id: string;
+  workspaceId: string;
+  label: string;
+  position: number;
+}
+
 export interface JobApplication {
   id: string;
   workspaceId: string;
@@ -38,8 +41,9 @@ export interface JobApplication {
   payMin: number | null;
   payMax: number | null;
   payMedian: number | null;
+  hourly: boolean; // true = hourly rate, false = annual salary
   state: ApplicationState;
-  stage: ApplicationStage | null;
+  stage: string | null; // a WorkspaceStage label
   interviewNumber: number | null;
   locationCity: string | null;
   locationState: string | null;

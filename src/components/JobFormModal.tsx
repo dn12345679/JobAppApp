@@ -1,18 +1,18 @@
 import { useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import type {
-  ApplicationStage,
   ApplicationState,
   AuthKind,
   Flag,
   JobApplication,
+  WorkspaceStage,
 } from "../types";
 import { createJob, updateJob } from "../lib/db";
 import {
   AUTH_OPTIONS,
   FLAG_OPTIONS,
-  STAGE_OPTIONS,
   STATE_OPTIONS,
+  isInterviewStage,
   normalizeJob,
 } from "../lib/jobRules";
 
@@ -21,11 +21,13 @@ type PayMode = "range" | "median";
 export default function JobFormModal({
   workspaceId,
   job,
+  stages,
   onClose,
   onSaved,
 }: {
   workspaceId: string;
   job?: JobApplication;
+  stages: WorkspaceStage[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -39,10 +41,11 @@ export default function JobFormModal({
   const [payMin, setPayMin] = useState(numStr(job?.payMin));
   const [payMax, setPayMax] = useState(numStr(job?.payMax));
   const [payMedian, setPayMedian] = useState(numStr(job?.payMedian));
+  const [hourly, setHourly] = useState(job?.hourly ?? false);
   const [state, setState] = useState<ApplicationState>(
     job?.state ?? "NotApplied",
   );
-  const [stage, setStage] = useState<ApplicationStage | "">(job?.stage ?? "");
+  const [stage, setStage] = useState<string>(job?.stage ?? "");
   const [interviewNumber, setInterviewNumber] = useState(
     numStr(job?.interviewNumber),
   );
@@ -79,6 +82,7 @@ export default function JobFormModal({
       payMin: payMode === "range" ? toNum(payMin) : null,
       payMax: payMode === "range" ? toNum(payMax) : null,
       payMedian: payMode === "median" ? toNum(payMedian) : null,
+      hourly,
       state,
       stage: stage || null,
       interviewNumber: toNum(interviewNumber),
@@ -140,13 +144,21 @@ export default function JobFormModal({
 
           {/* Pay */}
           <Field label="Pay (USD)">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Segmented
                 value={payMode}
                 onChange={setPayMode}
                 options={[
                   { value: "range", label: "Range" },
                   { value: "median", label: "Median" },
+                ]}
+              />
+              <Segmented
+                value={hourly ? "hourly" : "annual"}
+                onChange={(v) => setHourly(v === "hourly")}
+                options={[
+                  { value: "annual", label: "/yr" },
+                  { value: "hourly", label: "/hr" },
                 ]}
               />
               {payMode === "range" ? (
@@ -172,17 +184,21 @@ export default function JobFormModal({
             </Field>
             {state === "Applied" && (
               <Field label="Stage">
-                <select value={stage} onChange={(e) => setStage(e.target.value as ApplicationStage | "")} className={inputCls}>
+                <select value={stage} onChange={(e) => setStage(e.target.value)} className={inputCls}>
                   <option value="">—</option>
-                  {STAGE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
+                  {stages.map((s) => (
+                    <option key={s.id} value={s.label}>{s.label}</option>
                   ))}
+                  {/* Preserve a legacy/removed stage still on this job. */}
+                  {stage && !stages.some((s) => s.label === stage) && (
+                    <option value={stage}>{stage}</option>
+                  )}
                 </select>
               </Field>
             )}
           </div>
 
-          {state === "Applied" && stage === "Interview" && (
+          {state === "Applied" && isInterviewStage(stage) && (
             <Field label="Interview number">
               <input type="number" min={1} value={interviewNumber} onChange={(e) => setInterviewNumber(e.target.value)} className={inputCls} />
             </Field>

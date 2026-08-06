@@ -1,5 +1,19 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { JobApplication, NewJobInput, Role, Workspace } from "../types";
+import type {
+  JobApplication,
+  NewJobInput,
+  Role,
+  Workspace,
+  WorkspaceStage,
+} from "../types";
+
+export const DEFAULT_STAGES = [
+  "In Review",
+  "Interview",
+  "Rejected",
+  "Accepted",
+  "Declined",
+];
 
 // Must match DB_URL in src-tauri/src/lib.rs.
 const DB_URL = "sqlite:jobtracker.db";
@@ -30,6 +44,7 @@ function rowToJob(r: JobRow): JobApplication {
     payMin: (r.pay_min as number) ?? null,
     payMax: (r.pay_max as number) ?? null,
     payMedian: (r.pay_median as number) ?? null,
+    hourly: Number(r.hourly) === 1,
     state: r.state as JobApplication["state"],
     stage: (r.stage as JobApplication["stage"]) ?? null,
     interviewNumber: (r.interview_number as number) ?? null,
@@ -190,6 +205,7 @@ export async function createWorkspace(
      VALUES ($1, $2, 'owner', $3)`,
     [ownerId, ws.id, ts],
   );
+  await seedDefaultStages(ws.id);
   return ws;
 }
 
@@ -212,6 +228,95 @@ export async function renameWorkspace(id: string, name: string): Promise<void> {
   await db.execute(
     "UPDATE workspaces SET name = $2, dirty = 1, updated_at = $3 WHERE id = $1",
     [id, name.trim() || "Untitled", now()],
+  );
+}
+
+// ---- stages (per-workspace, user-editable) ----------------------------------
+
+function stageFromRow(r: JobRow): WorkspaceStage {
+  return {
+    id: r.id as string,
+    workspaceId: r.workspace_id as string,
+    label: r.label as string,
+    position: Number(r.position ?? 0),
+  };
+}
+
+export async function listStages(
+  workspaceId: string,
+): Promise<WorkspaceStage[]> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM stages WHERE workspace_id = $1 AND deleted = 0 ORDER BY position, created_at",
+    [workspaceId],
+  );
+  return rows.map(stageFromRow);
+}
+
+export async function seedDefaultStages(workspaceId: string): Promise<void> {
+  const db = await getDb();
+  const ts = now();
+  for (let i = 0; i < DEFAULT_STAGES.length; i++) {
+    await db.execute(
+      `INSERT INTO stages (id, workspace_id, label, position, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $5, 1, 0)`,
+      [uuid(), workspaceId, DEFAULT_STAGES[i], i, ts],
+    );
+  }
+}
+
+/** Seeds default stages only if the workspace has none (fresh workspace). */
+export async function ensureStages(workspaceId: string): Promise<void> {
+  const existing = await listStages(workspaceId);
+  if (existing.length === 0) await seedDefaultStages(workspaceId);
+}
+
+export async function createStage(
+  workspaceId: string,
+  label: string,
+): Promise<void> {
+  const db = await getDb();
+  const l = label.trim();
+  if (!l) return;
+  const rows = await db.select<JobRow[]>(
+    "SELECT COALESCE(MAX(position), -1) AS p FROM stages WHERE workspace_id = $1 AND deleted = 0",
+    [workspaceId],
+  );
+  const pos = Number(rows[0]?.p ?? -1) + 1;
+  const ts = now();
+  await db.execute(
+    `INSERT INTO stages (id, workspace_id, label, position, created_at, updated_at, dirty, deleted)
+     VALUES ($1, $2, $3, $4, $5, $5, 1, 0)`,
+    [uuid(), workspaceId, l, pos, ts],
+  );
+}
+
+/** Renames a stage and propagates the new label to every job that used it. */
+export async function renameStage(
+  workspaceId: string,
+  id: string,
+  oldLabel: string,
+  newLabel: string,
+): Promise<void> {
+  const db = await getDb();
+  const l = newLabel.trim();
+  if (!l || l === oldLabel) return;
+  const ts = now();
+  await db.execute(
+    "UPDATE stages SET label = $2, dirty = 1, updated_at = $3 WHERE id = $1",
+    [id, l, ts],
+  );
+  await db.execute(
+    "UPDATE job_applications SET stage = $2, dirty = 1, updated_at = $3 WHERE workspace_id = $1 AND stage = $4 AND deleted = 0",
+    [workspaceId, l, ts, oldLabel],
+  );
+}
+
+export async function deleteStage(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE stages SET deleted = 1, dirty = 1, updated_at = $2 WHERE id = $1",
+    [id, now()],
   );
 }
 
@@ -255,6 +360,7 @@ export async function createJob(
     payMin: input.payMin ?? null,
     payMax: input.payMax ?? null,
     payMedian: input.payMedian ?? null,
+    hourly: input.hourly ?? false,
     state: input.state ?? "NotApplied",
     stage: input.stage ?? null,
     interviewNumber: input.interviewNumber ?? null,
@@ -281,18 +387,18 @@ export async function createJob(
        id, workspace_id, company, title, pay_min, pay_max, pay_median,
        state, stage, interview_number, location_city, location_state, remote,
        username, auth, notes, deadline, date_applied, last_update,
-       next_interview_date, flag, link, tags, created_at, updated_at, end_date, dirty, deleted
+       next_interview_date, flag, link, tags, created_at, updated_at, end_date, hourly, dirty, deleted
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7,
        $8, $9, $10, $11, $12, $13,
        $14, $15, $16, $17, $18, $19,
-       $20, $21, $22, $23, $24, $25, $26, 1, 0
+       $20, $21, $22, $23, $24, $25, $26, $27, 1, 0
      )`,
     [
       job.id, job.workspaceId, job.company, job.title, job.payMin, job.payMax, job.payMedian,
       job.state, job.stage, job.interviewNumber, job.locationCity, job.locationState, job.remote ? 1 : 0,
       job.username, job.auth, job.notes, job.deadline, job.dateApplied, job.lastUpdate,
-      job.nextInterviewDate, job.flag, job.link, JSON.stringify(job.tags), job.createdAt, job.updatedAt, job.endDate,
+      job.nextInterviewDate, job.flag, job.link, JSON.stringify(job.tags), job.createdAt, job.updatedAt, job.endDate, job.hourly ? 1 : 0,
     ],
   );
   return job;
@@ -307,14 +413,14 @@ export async function updateJob(job: JobApplication): Promise<JobApplication> {
        state = $7, stage = $8, interview_number = $9, location_city = $10,
        location_state = $11, remote = $12, username = $13, auth = $14, notes = $15,
        deadline = $16, date_applied = $17, last_update = $18, next_interview_date = $19,
-       flag = $20, link = $21, tags = $22, updated_at = $23, end_date = $24, dirty = 1
+       flag = $20, link = $21, tags = $22, updated_at = $23, end_date = $24, hourly = $25, dirty = 1
      WHERE id = $1`,
     [
       updated.id, updated.company, updated.title, updated.payMin, updated.payMax, updated.payMedian,
       updated.state, updated.stage, updated.interviewNumber, updated.locationCity,
       updated.locationState, updated.remote ? 1 : 0, updated.username, updated.auth, updated.notes,
       updated.deadline, updated.dateApplied, updated.lastUpdate, updated.nextInterviewDate,
-      updated.flag, updated.link, JSON.stringify(updated.tags), updated.updatedAt, updated.endDate,
+      updated.flag, updated.link, JSON.stringify(updated.tags), updated.updatedAt, updated.endDate, updated.hourly ? 1 : 0,
     ],
   );
   return updated;

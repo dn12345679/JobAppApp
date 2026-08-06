@@ -15,6 +15,7 @@ const COLUMNS: [string, (j: JobApplication) => string][] = [
   ["Pay Min", (j) => (j.payMin != null ? String(j.payMin) : "")],
   ["Pay Max", (j) => (j.payMax != null ? String(j.payMax) : "")],
   ["Pay Median", (j) => (j.payMedian != null ? String(j.payMedian) : "")],
+  ["Pay Type", (j) => (j.hourly ? "Hourly" : "Annual")],
   ["Remote", (j) => (j.remote ? "Yes" : "No")],
   ["City", (j) => j.locationCity ?? ""],
   ["State/Region", (j) => j.locationState ?? ""],

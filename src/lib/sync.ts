@@ -129,6 +129,26 @@ export async function syncAll(): Promise<SyncResult> {
     await db.execute("UPDATE job_applications SET dirty = 0 WHERE dirty = 1");
   }
 
+  // 4b. PUSH dirty stages.
+  const dirtyStages = await db.select<Row[]>(
+    "SELECT * FROM stages WHERE dirty = 1",
+  );
+  if (dirtyStages.length) {
+    const { error } = await supabase.from("stages").upsert(
+      dirtyStages.map((s) => ({
+        id: s.id,
+        workspace_id: s.workspace_id,
+        label: s.label,
+        position: Number(s.position ?? 0),
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        deleted: !!s.deleted,
+      })),
+    );
+    if (error) throw new Error(`push stages: ${error.message}`);
+    await db.execute("UPDATE stages SET dirty = 0 WHERE dirty = 1");
+  }
+
   // 5. PULL everything visible (RLS limits to the user's workspaces).
   const { data: wsRemote, error: wsErr } = await supabase
     .from("workspaces")
@@ -147,6 +167,12 @@ export async function syncAll(): Promise<SyncResult> {
     .select("*");
   if (jobsErr) throw new Error(`pull jobs: ${jobsErr.message}`);
   for (const j of jobsRemote ?? []) await upsertJobLocal(j);
+
+  const { data: stagesRemote, error: stagesErr } = await supabase
+    .from("stages")
+    .select("*");
+  if (stagesErr) throw new Error(`pull stages: ${stagesErr.message}`);
+  for (const s of stagesRemote ?? []) await upsertStageLocal(s);
 
   return {
     pushedJobs: dirtyJobs.length,
@@ -177,15 +203,30 @@ export async function syncAll(): Promise<SyncResult> {
     );
   }
 
+  async function upsertStageLocal(s: Row) {
+    await db.execute(
+      `INSERT INTO stages (id, workspace_id, label, position, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
+       ON CONFLICT(id) DO UPDATE SET
+         label = excluded.label, position = excluded.position,
+         updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
+       WHERE excluded.updated_at >= stages.updated_at`,
+      [
+        s.id, s.workspace_id, s.label, Number(s.position ?? 0),
+        s.created_at, s.updated_at, bool01(s.deleted),
+      ],
+    );
+  }
+
   async function upsertJobLocal(j: Row) {
     await db.execute(
       `INSERT INTO job_applications (
          id, workspace_id, company, title, pay_min, pay_max, pay_median,
          state, stage, interview_number, location_city, location_state, remote,
          username, auth, notes, deadline, date_applied, last_update,
-         next_interview_date, flag, link, tags, created_at, updated_at, end_date, dirty, deleted
+         next_interview_date, flag, link, tags, created_at, updated_at, end_date, hourly, dirty, deleted
        ) VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,0,$27
+         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,0,$28
        )
        ON CONFLICT(id) DO UPDATE SET
          workspace_id = excluded.workspace_id, company = excluded.company,
@@ -197,14 +238,14 @@ export async function syncAll(): Promise<SyncResult> {
          deadline = excluded.deadline, date_applied = excluded.date_applied,
          last_update = excluded.last_update, next_interview_date = excluded.next_interview_date,
          flag = excluded.flag, link = excluded.link, tags = excluded.tags,
-         end_date = excluded.end_date,
+         end_date = excluded.end_date, hourly = excluded.hourly,
          updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
        WHERE excluded.updated_at >= job_applications.updated_at`,
       [
         j.id, j.workspace_id, j.company, j.title, num(j.pay_min), num(j.pay_max), num(j.pay_median),
         j.state, j.stage ?? null, num(j.interview_number), j.location_city ?? null, j.location_state ?? null, bool01(j.remote),
         j.username ?? null, j.auth ?? "none", j.notes ?? null, j.deadline ?? null, j.date_applied ?? null, j.last_update ?? null,
-        j.next_interview_date ?? null, j.flag ?? null, j.link ?? null, parseTags(j.tags), j.created_at, j.updated_at, j.end_date ?? null, bool01(j.deleted),
+        j.next_interview_date ?? null, j.flag ?? null, j.link ?? null, parseTags(j.tags), j.created_at, j.updated_at, j.end_date ?? null, bool01(j.hourly), bool01(j.deleted),
       ],
     );
   }
@@ -267,6 +308,7 @@ function localJobToRemote(r: Row) {
     pay_min: num(r.pay_min),
     pay_max: num(r.pay_max),
     pay_median: num(r.pay_median),
+    hourly: !!r.hourly,
     state: r.state,
     stage: r.stage ?? null,
     interview_number: num(r.interview_number),

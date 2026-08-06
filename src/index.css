@@ -44,3 +44,18 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
+
+/* Recharts tooltip ("hover card") — force theme tokens so it follows the theme. */
+.recharts-default-tooltip {
+  background: var(--surface) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  color: var(--ink) !important;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+}
+.recharts-tooltip-label,
+.recharts-tooltip-item,
+.recharts-tooltip-item-name,
+.recharts-tooltip-item-value {
+  color: var(--ink) !important;
+}

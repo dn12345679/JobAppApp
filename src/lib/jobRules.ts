@@ -1,10 +1,4 @@
-import type {
-  ApplicationStage,
-  ApplicationState,
-  AuthKind,
-  Flag,
-  JobApplication,
-} from "../types";
+import type { ApplicationState, AuthKind, Flag, JobApplication } from "../types";
 
 export const STATE_OPTIONS: { value: ApplicationState; label: string }[] = [
   { value: "NotApplied", label: "Not applied" },
@@ -12,13 +6,10 @@ export const STATE_OPTIONS: { value: ApplicationState; label: string }[] = [
   { value: "Applied", label: "Applied" },
 ];
 
-export const STAGE_OPTIONS: { value: ApplicationStage; label: string }[] = [
-  { value: "InReview", label: "In review" },
-  { value: "Interview", label: "Interview" },
-  { value: "Rejected", label: "Rejected" },
-  { value: "Accepted", label: "Accepted" },
-  { value: "Declined", label: "I declined" },
-];
+/** Whether a (custom) stage label represents an interview, enabling the # field. */
+export function isInterviewStage(label: string | null): boolean {
+  return !!label && label.toLowerCase().includes("interview");
+}
 
 export const FLAG_OPTIONS: { value: Flag; label: string }[] = [
   { value: "red", label: "🔴 Apply now" },
@@ -36,14 +27,6 @@ export const STATE_LABELS: Record<ApplicationState, string> = {
   NotApplied: "Not applied",
   InProgress: "In progress",
   Applied: "Applied",
-};
-
-export const STAGE_LABELS: Record<ApplicationStage, string> = {
-  InReview: "In review",
-  Interview: "Interview",
-  Rejected: "Rejected",
-  Accepted: "Accepted",
-  Declined: "Declined",
 };
 
 export const FLAG_DOT: Record<Flag, string> = {
@@ -64,7 +47,7 @@ export const STATE_STYLES: Record<ApplicationState, string> = {
  */
 export function normalizeJob(
   job: JobApplication,
-  previousStage?: ApplicationStage | null,
+  previousStage?: string | null,
 ): JobApplication {
   const next = { ...job };
 
@@ -73,7 +56,7 @@ export function normalizeJob(
     next.stage = null;
     next.interviewNumber = null;
   }
-  if (next.stage !== "Interview") {
+  if (!isInterviewStage(next.stage)) {
     next.interviewNumber = null;
   }
 
