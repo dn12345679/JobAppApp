@@ -1,0 +1,89 @@
+/* =========================================================================
+   THEME PRESETS
+   -------------------------------------------------------------------------
+   Each theme is just a set of these tokens. The default (:root) is "Midnight".
+   To add a theme:
+     1. Copy a [data-theme="…"] block below, rename it, tweak the colors.
+     2. Add its id + label to THEMES in src/lib/theme.ts so it shows in the menu.
+
+   Token guide:
+     --bg          page background          --ink      primary text
+     --surface     cards / header / inputs  --ink-2    secondary text
+     --surface-2   nested / darker panels   --muted    labels / captions
+     --line        borders / dividers       --dim      faint text
+     --field       input borders            --accent   primary action color
+     --accent-hover / --accent-2 / --accent-1  accent shades (hover, mid, light)
+   Keep `color-scheme` as `dark` or `light` so native inputs/date pickers match.
+   ========================================================================= */
+
+/* Menu: "Midnight" · THEMES id "midnight" (the default — no data-theme attr). */
+:root {
+  color-scheme: dark;
+  --bg: #0b1120;
+  --surface-2: #0f172a;
+  --surface: #1e293b;
+  --line: #334155;
+  --field: #475569;
+  --dim: #64748b;
+  --muted: #94a3b8;
+  --ink-2: #cbd5e1;
+  --ink: #f1f5f9;
+  --accent: #4f46e5;
+  --accent-hover: #6366f1;
+  --accent-2: #818cf8;
+  --accent-1: #a5b4fc;
+}
+
+/* Menu: "Ocean" · THEMES id "ocean" (must match the button in src/lib/theme.ts). */
+:root[data-theme="ocean"] {
+  color-scheme: dark;
+  --bg: #071820;
+  --surface-2: #0b2530;
+  --surface: #123443;
+  --line: #1d4d60;
+  --field: #266481;
+  --dim: #5f93a8;
+  --muted: #90bccd;
+  --ink-2: #cbe8f2;
+  --ink: #edf8fc;
+  --accent: #0891b2;
+  --accent-hover: #06b6d4;
+  --accent-2: #22d3ee;
+  --accent-1: #67e8f9;
+}
+
+/* Menu: "Plum" · THEMES id "plum" (must match the button in src/lib/theme.ts). */
+:root[data-theme="plum"] {
+  color-scheme: dark;
+  --bg: #160f1f;
+  --surface-2: #1e1430;
+  --surface: #2a1c42;
+  --line: #402b5f;
+  --field: #573b7d;
+  --dim: #8b6ca8;
+  --muted: #b294cc;
+  --ink-2: #e0cef0;
+  --ink: #f5eefb;
+  --accent: #9333ea;
+  --accent-hover: #a855f7;
+  --accent-2: #c084fc;
+  --accent-1: #d8b4fe;
+}
+
+/* Menu: "Light" · THEMES id "light" (must match the button in src/lib/theme.ts). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f7;
+  --surface-2: #f8fafc;
+  --surface: #ffffff;
+  --line: #e2e8f0;
+  --field: #cbd5e1;
+  --dim: #94a3b8;
+  --muted: #64748b;
+  --ink-2: #334155;
+  --ink: #0f172a;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-2: #6366f1;
+  --accent-1: #4f46e5;
+}

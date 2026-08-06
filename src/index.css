@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* Theme system ------------------------------------------------------------
+   The UI is built on Tailwind's `slate` (neutrals) and `indigo` (accent)
+   scales. Here we point those scale values at semantic theme tokens defined
+   in themes.css. A theme can then restyle the whole app by overriding ~13
+   variables — no component markup changes needed. See themes.css to add one. */
+@theme {
+  --color-slate-950: var(--bg);
+  --color-slate-900: var(--surface-2);
+  --color-slate-800: var(--surface);
+  --color-slate-700: var(--line);
+  --color-slate-600: var(--field);
+  --color-slate-500: var(--dim);
+  --color-slate-400: var(--muted);
+  --color-slate-300: var(--ink-2);
+  --color-slate-200: var(--ink);
+  --color-slate-100: var(--ink);
+  --color-indigo-600: var(--accent);
+  --color-indigo-500: var(--accent-hover);
+  --color-indigo-400: var(--accent-2);
+  --color-indigo-300: var(--accent-1);
+  --color-indigo-200: var(--accent-1);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
