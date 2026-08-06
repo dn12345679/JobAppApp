@@ -129,9 +129,13 @@ export async function syncAll(): Promise<SyncResult> {
     await db.execute("UPDATE job_applications SET dirty = 0 WHERE dirty = 1");
   }
 
-  // 4b. PUSH dirty stages.
+  // 4b. PUSH dirty stages — only for workspaces we can write to, so an orphaned
+  //     stage (e.g. left over from another account) can never abort the sync.
   const dirtyStages = await db.select<Row[]>(
-    "SELECT * FROM stages WHERE dirty = 1",
+    `SELECT s.* FROM stages s
+     JOIN memberships m ON m.workspace_id = s.workspace_id
+     WHERE s.dirty = 1 AND m.user_id = $1 AND m.role IN ('owner', 'editor')`,
+    [uid],
   );
   if (dirtyStages.length) {
     const { error } = await supabase.from("stages").upsert(

@@ -126,6 +126,7 @@ async function ensureDefaultWorkspaceImpl(): Promise<Workspace> {
 export async function clearLocalData(): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM job_applications");
+  await db.execute("DELETE FROM stages");
   await db.execute("DELETE FROM memberships");
   await db.execute("DELETE FROM workspaces");
   ensurePromise = null; // allow a fresh seed for the new account
