@@ -15,6 +15,10 @@ dist-ssr
 
 .claude
 
+
+
+PROJECT_SUMMARY.md
+
 # Local secrets — never commit
 .env
 .env.*

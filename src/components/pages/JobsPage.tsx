@@ -283,6 +283,7 @@ export default function JobsPage({
             workspaceId={workspaceId}
             job={modal.job}
             stages={stages}
+            tagSuggestions={allTags}
             onClose={() => setModal(null)}
             onSaved={() => {
               setModal(null);

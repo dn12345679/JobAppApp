@@ -8,6 +8,7 @@ import type {
   WorkspaceStage,
 } from "../types";
 import { createJob, updateJob } from "../lib/db";
+import TagInput from "./TagInput";
 import {
   AUTH_OPTIONS,
   FLAG_DOT,
@@ -23,12 +24,14 @@ export default function JobFormModal({
   workspaceId,
   job,
   stages,
+  tagSuggestions = [],
   onClose,
   onSaved,
 }: {
   workspaceId: string;
   job?: JobApplication;
   stages: WorkspaceStage[];
+  tagSuggestions?: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -270,7 +273,7 @@ export default function JobFormModal({
             <Field label="Next interview">
               <input type="date" value={nextInterviewDate} onChange={(e) => setNextInterviewDate(e.target.value)} className={inputCls} />
             </Field>
-            <Field label="End date">
+            <Field label="Decision date">
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
             </Field>
           </div>
@@ -279,9 +282,12 @@ export default function JobFormModal({
             <input type="url" placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} className={inputCls} />
           </Field>
 
-          <Field label="Tags">
-            <TagInput tags={tags} onChange={setTags} />
-          </Field>
+          {/* Not a <Field>: its wrapping <label> would bind to the first tag's
+              × button, so hovering/clicking the field would target that button. */}
+          <div className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-400">Tags</span>
+            <TagInput tags={tags} onChange={setTags} suggestions={tagSuggestions} />
+          </div>
 
           <Field label="Notes">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={`${inputCls} resize-none`} />
@@ -302,48 +308,6 @@ export default function JobFormModal({
         </div>
       </motion.div>
     </motion.div>
-  );
-}
-
-function TagInput({
-  tags,
-  onChange,
-}: {
-  tags: string[];
-  onChange: (t: string[]) => void;
-}) {
-  const [draft, setDraft] = useState("");
-
-  function commit() {
-    const v = draft.trim();
-    if (v && !tags.includes(v)) onChange([...tags, v]);
-    setDraft("");
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900/60 px-2 py-1.5">
-      {tags.map((t) => (
-        <span key={t} className="flex items-center gap-1 rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-200">
-          {t}
-          <button onClick={() => onChange(tags.filter((x) => x !== t))} className="text-indigo-300 hover:text-white">×</button>
-        </span>
-      ))}
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            commit();
-          } else if (e.key === "Backspace" && !draft && tags.length) {
-            onChange(tags.slice(0, -1));
-          }
-        }}
-        onBlur={commit}
-        placeholder={tags.length ? "" : "Add tags…"}
-        className="min-w-[6rem] flex-1 bg-transparent px-1 py-0.5 text-sm text-slate-100 outline-none"
-      />
-    </div>
   );
 }
 
