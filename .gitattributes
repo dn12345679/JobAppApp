@@ -1,0 +1,4 @@
+# Keep embedded SQL migrations byte-identical across platforms. tauri-plugin-sql
+# checksums each migration's bytes; a CRLF/LF difference at build time changes the
+# checksum and makes existing installs fail with "migration N ... has been modified".
+*.sql text eol=lf

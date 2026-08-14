@@ -15,6 +15,10 @@
       "identifier": "fs:allow-write-text-file",
       "allow": [{ "path": "$HOME/**" }]
     },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$APPCONFIG/jobtracker.db*" }]
+    },
     "updater:default",
     "process:allow-restart"
   ]

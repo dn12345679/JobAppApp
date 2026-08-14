@@ -123,10 +123,14 @@ create policy ws_delete on public.workspaces
 
 -- Memberships: you always see your own rows (also makes upsert read-back work);
 -- members see the roster; the owner manages it; you may remove yourself.
+-- Insert is OWNER-ONLY: allowing `user_id = auth.uid()` would let any user add
+-- themselves to any workspace whose UUID they learn, then read/write its jobs.
+-- The owner's own seed membership is already covered by is_owner (they own the
+-- workspace); invites go through the invite_to_workspace RPC (SECURITY DEFINER).
 create policy mem_select on public.memberships
   for select using (user_id = auth.uid() or public.is_member(workspace_id));
 create policy mem_insert on public.memberships
-  for insert with check (public.is_owner(workspace_id) or user_id = auth.uid());
+  for insert with check (public.is_owner(workspace_id));
 create policy mem_update on public.memberships
   for update using (public.is_owner(workspace_id));
 create policy mem_delete on public.memberships

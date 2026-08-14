@@ -1,4 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
+import { BaseDirectory, remove } from "@tauri-apps/plugin-fs";
 import type {
   ContactInfo,
   JobApplication,
@@ -29,8 +30,44 @@ export const LOCAL_USER_ID = "local";
 let dbPromise: Promise<Database> | null = null;
 
 export function getDb(): Promise<Database> {
-  if (!dbPromise) dbPromise = Database.load(DB_URL);
+  if (!dbPromise) dbPromise = loadDbWithRecovery();
   return dbPromise;
+}
+
+/**
+ * Opens the local SQLite cache, self-healing a corrupt/incompatible file. The
+ * local DB is a disposable cache — Supabase is canonical — so a migration
+ * checksum mismatch (e.g. an old DB left behind by a previous install; SQLite
+ * migrations can't be safely reapplied once changed) must NOT brick the app.
+ * On such a failure we delete the file and re-create it fresh; the next sync
+ * re-pulls everything. Only migration failures trigger the reset — other errors
+ * (e.g. disk/permission) propagate so we don't silently wipe data for no reason.
+ */
+async function loadDbWithRecovery(): Promise<Database> {
+  try {
+    return await Database.load(DB_URL);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/migrat/i.test(msg)) throw e;
+    console.warn("[db] migration mismatch — resetting local cache:", msg);
+    await resetLocalDbFiles();
+    return await Database.load(DB_URL);
+  }
+}
+
+/** Deletes the SQLite file (and its WAL/SHM sidecars) from the app config dir. */
+async function resetLocalDbFiles(): Promise<void> {
+  for (const name of [
+    "jobtracker.db",
+    "jobtracker.db-wal",
+    "jobtracker.db-shm",
+  ]) {
+    try {
+      await remove(name, { baseDir: BaseDirectory.AppConfig });
+    } catch {
+      /* sidecar files may not exist — ignore */
+    }
+  }
 }
 
 const now = () => new Date().toISOString();

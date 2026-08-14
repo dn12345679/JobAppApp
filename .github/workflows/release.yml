@@ -16,8 +16,14 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
+            args: ""
           - platform: ubuntu-22.04
-          # - platform: macos-latest   # add if you want macOS (needs signing for smooth installs)
+            args: ""
+          # macOS is UNSIGNED (no $99 Apple Developer cert): it builds and
+          # auto-updates for free, but first launch shows a Gatekeeper warning —
+          # users open it via right-click → Open. Universal = Intel + Apple Silicon.
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -35,6 +41,10 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Add macOS universal targets
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -51,7 +61,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Job Tracker ${{ github.ref_name }}"
-          releaseBody: "Download the installer for your OS below. Existing installs update automatically."
+          releaseBody: "Download the installer for your OS below. Existing installs update automatically. macOS: right-click the app → Open on first launch (unsigned)."
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
+          args: ${{ matrix.args }}
