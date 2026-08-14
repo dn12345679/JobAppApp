@@ -341,7 +341,7 @@ export default function App() {
       {/* Sync status banner */}
       {syncMsg && (
         <div
-          className={`flex items-center justify-between px-6 py-1.5 text-xs ${
+          className={`flex items-center justify-between px-6 py-1.5text-xs ${
             syncMsg.startsWith("Sync error")
               ? "bg-rose-950/50 text-rose-300"
               : "text-slate-500"

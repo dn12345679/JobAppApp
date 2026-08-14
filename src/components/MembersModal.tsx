@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import ModalPortal from "./ModalPortal";
 import type { Role } from "../types";
 import { listJobs, renameWorkspace } from "../lib/db";
 import { deleteWorkspaceSmart } from "../lib/sync";
@@ -136,13 +137,14 @@ export default function MembersModal({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 p-4"
-    >
+    <ModalPortal>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      >
       <motion.div
         initial={{ scale: 0.96, y: 12 }}
         animate={{ scale: 1, y: 0 }}
@@ -326,7 +328,8 @@ export default function MembersModal({
           </div>
         )}
       </motion.div>
-    </motion.div>
+      </motion.div>
+    </ModalPortal>
   );
 }
 

@@ -284,15 +284,13 @@ function weekdayData(jobs: JobApplication[]) {
 }
 
 function buildSankey(c: Counts) {
+  // Only the outcomes of jobs actually applied to: a single "Applied" source
+  // branching to each stage. Keeping every branch at the same column depth
+  // avoids the cross-column ribbon overlap that ragged depths produce.
   const edges = (
-    [
-      ["Applications", "Not applied", c.notApplied],
-      ["Applications", "In progress", c.inProgress],
-      ["Applications", "Applied", c.applied],
-      ...Object.entries(c.stages).map(
-        ([label, count]): [string, string, number] => ["Applied", label, count],
-      ),
-    ] as [string, string, number][]
+    Object.entries(c.stages).map(
+      ([label, count]): [string, string, number] => ["Applied", label, count],
+    ) as [string, string, number][]
   ).filter(([, , v]) => v > 0);
 
   if (edges.length === 0) return null;

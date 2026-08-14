@@ -1,4 +1,4 @@
-// Domain model — mirrors DESIGN.md §5.
+// Domain model 
 
 export type Role = "owner" | "editor" | "viewer";
 

@@ -48,7 +48,7 @@
   --rose-500: #f43f5e;
   --rose-600: #e11d48;
   --rose-950: #4c0519;
-  --sky-300: #7dd3fc;
+  --sky-300: #7dd3fc; 
   --fuchsia-300: #f0abfc;
   --teal-300: #5eead4;
 }
@@ -114,18 +114,18 @@
   --bg: #ffefc4;
   --surface-2: #faecc8;
   
-  --surface: #fdeab7;
+  --surface: #f8efd4;
   --line: #f2dfb0;
   --field: #faffde07;
   
   --dim: #736d3f;
-  --muted: #b7af93;
+  --muted: #55544f;
   
   --ink-2: #525533;
   --ink: #433c1b;
 
   --accent: #dbba50; 
-  --accent-hover: #c8a73c;
+  --accent-hover: #edd172;
   
   --accent-2: #faae68;
   --accent-1: #020202;
@@ -167,6 +167,34 @@
   --accent-hover: #3ba0e6;
   --accent-2: #5cb8f2;
   --accent-1: #185a8f;  /* darker blue for readable colored text */
+}
+
+/* =========================================================================
+   STATUS HUES FOR LIGHT THEMES
+   -------------------------------------------------------------------------
+   The default status tokens in :root are light Tailwind tints (emerald-300,
+   amber-300, …) chosen to read as *text on dark* surfaces. On a light theme
+   they wash out. Here we override just the shades used as text/dots with
+   darker, saturated equivalents that keep the green/amber/rose identity but
+   read on light backgrounds. Fills/washes (-500/-600) are already fine on
+   light, so they're left alone. --rose-950 is a *background* (the sync-error
+   banner) so it flips to a pale rose instead of darkening.
+   ========================================================================= */
+:root[data-theme="light"],
+:root[data-theme="butter"],
+:root[data-theme="sakura"],
+:root[data-theme="aero"] {
+  --emerald-300: #047857; /* emerald-700 — readable green text */
+  --emerald-400: #059669; /* emerald-600 */
+  --amber-200: #a16207; /* yellow-700 */
+  --amber-300: #b45309; /* amber-700 */
+  --amber-400: #d97706; /* amber-600 — deeper gold: visible dots on cream/butter */
+  --rose-300: #be123c; /* rose-700 */
+  --rose-400: #e11d48; /* rose-600 — readable red text */
+  --rose-950: #ffe4e6; /* rose-100 — pale bg for the sync-error banner */
+  --sky-300: #0284c7; /* sky-600 */
+  --fuchsia-300: #c026d3; /* fuchsia-600 */
+  --teal-300: #0d9488; /* teal-600 */
 }
 
 /* =========================================================================

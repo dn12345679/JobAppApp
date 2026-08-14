@@ -121,7 +121,9 @@ export default function ResumePreview({
       <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2.5">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-            fits ? "bg-emerald-300 text-emerald-900" : "bg-amber-300 text-amber-900"
+            fits
+              ? "bg-emerald-500/20 text-emerald-300"
+              : "bg-amber-500/20 text-amber-300"
           }`}
           title="Estimated printed length"
         >

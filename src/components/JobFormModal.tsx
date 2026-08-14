@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { createJob, updateJob } from "../lib/db";
 import TagInput from "./TagInput";
+import ModalPortal from "./ModalPortal";
 import {
   AUTH_OPTIONS,
   FLAG_DOT,
@@ -117,13 +118,14 @@ export default function JobFormModal({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="absolute inset-0 z-20 flex items-start justify-center overflow-auto bg-black/50 p-4 sm:items-center"
-    >
+    <ModalPortal>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/50 p-4 sm:items-center"
+      >
       <motion.div
         initial={{ scale: 0.96, y: 12 }}
         animate={{ scale: 1, y: 0 }}
@@ -307,7 +309,8 @@ export default function JobFormModal({
           </button>
         </div>
       </motion.div>
-    </motion.div>
+      </motion.div>
+    </ModalPortal>
   );
 }
 

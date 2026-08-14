@@ -11,10 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
-
 .claude
-
 DESIGN.md
 PROJECT_SUMMARY.md
 

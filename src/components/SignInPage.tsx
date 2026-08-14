@@ -52,7 +52,7 @@ export default function SignInPage() {
           <p className="mt-1 text-sm text-slate-400">
             {step === "email"
               ? "Sign in with your email to continue."
-              : `Enter the 6-digit code sent to ${email}.`}
+              : `Enter the 8-digit code sent to ${email}.`}
           </p>
         </div>
 
