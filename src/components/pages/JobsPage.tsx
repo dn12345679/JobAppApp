@@ -12,6 +12,7 @@ import {
   STATE_LABELS,
   STATE_STYLES,
   isInterviewStage,
+  isMissedDeadline,
 } from "../../lib/jobRules";
 import JobFormModal from "../JobFormModal";
 import TrashModal from "../TrashModal";
@@ -34,11 +35,14 @@ export default function JobsPage({
 }) {
   const [jobs, setJobs] = useState<JobApplication[]>([]);
   const [query, setQuery] = useState("");
-  const [stateFilter, setStateFilter] = useState<ApplicationState | "all">("all");
+  const [stateFilter, setStateFilter] = useState<
+    ApplicationState | "all" | "missed"
+  >("all");
   const [range, setRange] = useState<DateRange>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [hideMissed, setHideMissed] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
   const [modal, setModal] = useState<null | { job?: JobApplication }>(null);
   const [showTrash, setShowTrash] = useState(false);
@@ -74,7 +78,13 @@ export default function JobsPage({
         const hay = `${j.company} ${j.title} ${j.locationCity ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
-      if (stateFilter !== "all" && j.state !== stateFilter) return false;
+      if (stateFilter === "missed") {
+        if (!isMissedDeadline(j)) return false;
+      } else if (stateFilter !== "all" && j.state !== stateFilter) {
+        return false;
+      } else if (hideMissed && isMissedDeadline(j)) {
+        return false;
+      }
       if (activeTags.length && !activeTags.every((t) => j.tags.includes(t)))
         return false;
       if (range !== "all") {
@@ -99,7 +109,7 @@ export default function JobsPage({
       }
     });
     return result;
-  }, [jobs, query, stateFilter, range, customFrom, customTo, activeTags, sort]);
+  }, [jobs, query, stateFilter, range, customFrom, customTo, activeTags, sort, hideMissed]);
 
   async function doExport(format: ExportFormat) {
     setShowExport(false);
@@ -206,6 +216,12 @@ export default function JobsPage({
             {STATE_LABELS[s]}
           </Chip>
         ))}
+        <Chip
+          active={stateFilter === "missed"}
+          onClick={() => setStateFilter("missed")}
+        >
+          Missed deadline
+        </Chip>
         <span className="mx-1 h-4 w-px bg-slate-700" />
         {(["all", "week", "month", "custom"] as DateRange[]).map((r) => (
           <Chip key={r} active={range === r} onClick={() => setRange(r)}>
@@ -219,6 +235,13 @@ export default function JobsPage({
             <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
           </span>
         )}
+        <span className="mx-1 h-4 w-px bg-slate-700" />
+        <Chip
+          active={hideMissed}
+          onClick={() => setHideMissed((v) => !v)}
+        >
+          {hideMissed ? "✓ " : ""}Hide missed
+        </Chip>
       </div>
 
       {allTags.length > 0 && (
@@ -331,6 +354,7 @@ function JobRow({
         ? `${job.stage} #${job.interviewNumber}`
         : job.stage
       : null;
+  const missed = isMissedDeadline(job);
 
   return (
     <motion.div
@@ -353,7 +377,11 @@ function JobRow({
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
           <span>{location}</span>
           {pay && <span>{pay}</span>}
-          {job.deadline && <span>Due {fmtDate(job.deadline)}</span>}
+          {job.deadline && (
+            <span className={missed ? "text-rose-400" : undefined}>
+              Due {fmtDate(job.deadline)}
+            </span>
+          )}
           {job.endDate && <span>Ended {fmtDate(job.endDate)}</span>}
           {job.tags.map((t) => (
             <span key={t} className="rounded-full bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300">
@@ -365,6 +393,14 @@ function JobRow({
       {stageLabel && (
         <span className="shrink-0 rounded-full bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-300">
           {stageLabel}
+        </span>
+      )}
+      {missed && (
+        <span
+          className="shrink-0 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300"
+          title="Deadline passed without applying"
+        >
+          Missed deadline
         </span>
       )}
       <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATE_STYLES[job.state]}`}>

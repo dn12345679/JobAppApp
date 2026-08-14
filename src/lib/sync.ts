@@ -28,6 +28,15 @@ const toArray = (v: unknown): string[] => {
   const s = parseTags(v);
   return JSON.parse(s);
 };
+const parseJson = (v: unknown): Record<string, unknown> => {
+  if (typeof v !== "string") return {};
+  try {
+    const o = JSON.parse(v);
+    return o && typeof o === "object" ? o : {};
+  } catch {
+    return {};
+  }
+};
 
 /**
  * Full two-way reconcile between local SQLite (working copy) and Supabase
@@ -69,6 +78,15 @@ export async function syncAll(): Promise<SyncResult> {
   await db.execute(
     "DELETE FROM memberships WHERE workspace_id NOT IN (SELECT id FROM workspaces)",
   );
+
+  // Adopt an offline-seeded résumé profile (id/user_id 'local') for this user.
+  // OR IGNORE skips the rename if a row for this uid already exists; the delete
+  // then clears any leftover local seed. The profile is per-user (DESIGN.md §11).
+  await db.execute(
+    "UPDATE OR IGNORE resume_profile SET id = $1, user_id = $1, dirty = 1 WHERE user_id = 'local'",
+    [uid],
+  );
+  await db.execute("DELETE FROM resume_profile WHERE user_id = 'local'");
 
   // 2. PUSH all workspaces we own (not just dirty) so every membership's FK
   //    target is guaranteed to exist on the server before step 3.
@@ -153,6 +171,30 @@ export async function syncAll(): Promise<SyncResult> {
     await db.execute("UPDATE stages SET dirty = 0 WHERE dirty = 1");
   }
 
+  // 4c. PUSH the dirty résumé profile (only our own row; RLS is user-scoped).
+  //     `data` is TEXT locally but jsonb on the server, so parse it to an object.
+  const dirtyProfiles = await db.select<Row[]>(
+    "SELECT * FROM resume_profile WHERE dirty = 1 AND user_id = $1",
+    [uid],
+  );
+  if (dirtyProfiles.length) {
+    const { error } = await supabase.from("resume_profile").upsert(
+      dirtyProfiles.map((p) => ({
+        id: p.id,
+        user_id: p.user_id,
+        data: parseJson(p.data),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+        deleted: !!p.deleted,
+      })),
+    );
+    if (error) throw new Error(`push resume profile: ${error.message}`);
+    await db.execute(
+      "UPDATE resume_profile SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+      [uid],
+    );
+  }
+
   // 5. PULL everything visible (RLS limits to the user's workspaces).
   const { data: wsRemote, error: wsErr } = await supabase
     .from("workspaces")
@@ -177,6 +219,12 @@ export async function syncAll(): Promise<SyncResult> {
     .select("*");
   if (stagesErr) throw new Error(`pull stages: ${stagesErr.message}`);
   for (const s of stagesRemote ?? []) await upsertStageLocal(s);
+
+  const { data: rpRemote, error: rpErr } = await supabase
+    .from("resume_profile")
+    .select("*");
+  if (rpErr) throw new Error(`pull resume profile: ${rpErr.message}`);
+  for (const p of rpRemote ?? []) await upsertResumeProfileLocal(p);
 
   return {
     pushedJobs: dirtyJobs.length,
@@ -218,6 +266,22 @@ export async function syncAll(): Promise<SyncResult> {
       [
         s.id, s.workspace_id, s.label, Number(s.position ?? 0),
         s.created_at, s.updated_at, bool01(s.deleted),
+      ],
+    );
+  }
+
+  async function upsertResumeProfileLocal(p: Row) {
+    // `data` arrives as a jsonb object; store it as TEXT locally.
+    await db.execute(
+      `INSERT INTO resume_profile (id, user_id, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, 0, $6)
+       ON CONFLICT(id) DO UPDATE SET
+         user_id = excluded.user_id, data = excluded.data,
+         updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
+       WHERE excluded.updated_at >= resume_profile.updated_at`,
+      [
+        p.id, p.user_id, JSON.stringify(p.data ?? {}),
+        p.created_at, p.updated_at, bool01(p.deleted),
       ],
     );
   }

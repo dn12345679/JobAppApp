@@ -148,3 +148,94 @@
   --accent-2: #e781aa; /* mid pink */
   --accent-1: #bd3d70; /* darker rose for readable colored text */
 }
+
+/* Menu: "Aero" · THEMES id "aero" — glossy Frutiger Aero / Windows 7 glass.
+   These tokens set the base colors; the GLOSS LAYER at the very bottom of
+   this file adds the gradients, sheen, and blur that make it skeuomorphic. */
+:root[data-theme="aero"] {
+  color-scheme: light;
+  --bg: #bfe3f8;        /* sky (a gradient overrides this on <body>) */
+  --surface-2: #dceffb; /* deeper glass panels */
+  --surface: #eaf6ff;   /* glass cards / header controls / inputs */
+  --line: #a9d3ef;      /* soft blue borders */
+  --field: #8fc2e6;     /* input borders */
+  --dim: #5b7f96;       /* faint text */
+  --muted: #456a80;     /* labels / captions */
+  --ink-2: #1f4a66;     /* secondary text */
+  --ink: #0e3350;       /* primary text (deep ocean navy) */
+  --accent: #2b8fd8;    /* Aero blue */
+  --accent-hover: #3ba0e6;
+  --accent-2: #5cb8f2;
+  --accent-1: #185a8f;  /* darker blue for readable colored text */
+}
+
+/* =========================================================================
+   FRUTIGER AERO GLOSS LAYER  (only active under [data-theme="aero"])
+   -------------------------------------------------------------------------
+   Adds the gradients, sheen, glass blur, and bevels the flat token system
+   can't express. Targets the Tailwind classes the components already use —
+   bg-slate-800/900 (surfaces), bg-indigo-600 (primary buttons) — so no
+   component markup changes are needed. Remove this block to make "Aero" a
+   plain flat theme again.
+   ========================================================================= */
+
+/* Signature sky → water page backdrop with a soft light bloom + green hint. */
+:root[data-theme="aero"] body {
+  background:
+    radial-gradient(140% 90% at 50% -20%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 55%),
+    radial-gradient(90% 70% at 88% 115%, rgba(140, 220, 170, 0.55), rgba(140, 220, 170, 0) 60%),
+    linear-gradient(180deg, #7cc0ee 0%, #a7dbf3 42%, #d7f0ea 100%);
+  background-attachment: fixed;
+}
+
+/* Glass panels: cards, header controls, modals, dropdowns. */
+:root[data-theme="aero"] [class*="bg-slate-800"],
+:root[data-theme="aero"] [class*="bg-slate-900"] {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 22px rgba(26, 86, 140, 0.16);
+}
+
+/* Recessed, glossy form controls (higher specificity beats the panel look). */
+:root[data-theme="aero"] input[class],
+:root[data-theme="aero"] select[class],
+:root[data-theme="aero"] textarea[class] {
+  background-image: linear-gradient(180deg, rgba(233, 245, 255, 0.7), rgba(255, 255, 255, 0.9));
+  box-shadow:
+    inset 0 2px 4px rgba(26, 86, 140, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Windows 7 "gel" primary buttons: a top sheen over a blue vertical gradient. */
+:root[data-theme="aero"] [class*="bg-indigo-600"] {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.08) 48%,
+      rgba(0, 0, 0, 0.05) 52%,
+      rgba(0, 0, 0, 0.14) 100%
+    ),
+    linear-gradient(180deg, #62bdf6 0%, #2b8fd8 50%, #1d78c4 100%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(20, 80, 140, 0.35);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+:root[data-theme="aero"] [class*="bg-indigo-600"]:hover {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.65) 0%,
+      rgba(255, 255, 255, 0.1) 48%,
+      rgba(0, 0, 0, 0.04) 52%,
+      rgba(0, 0, 0, 0.1) 100%
+    ),
+    linear-gradient(180deg, #7cccff 0%, #3ba0e6 50%, #2b8fd8 100%);
+}

@@ -15,8 +15,7 @@ dist-ssr
 
 .claude
 
-
-
+DESIGN.md
 PROJECT_SUMMARY.md
 
 # Local secrets — never commit

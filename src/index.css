@@ -62,6 +62,30 @@ body {
   scrollbar-color: var(--line) transparent;
 }
 
+/* Résumé PDF export: print ONLY the résumé sheet, which is rendered into a
+   body-level portal (a sibling of #root) so hiding the app can't hide it.
+   See ResumePreview.tsx and DESIGN.md §11.7. */
+#resume-print {
+  display: none;
+}
+@media print {
+  @page {
+    size: letter;
+    margin: 0;
+  }
+  html,
+  body {
+    height: auto;
+    background: #fff;
+  }
+  #root {
+    display: none !important;
+  }
+  #resume-print {
+    display: block !important;
+  }
+}
+
 /* Recharts tooltip ("hover card") — force theme tokens so it follows the theme. */
 .recharts-default-tooltip {
   background: var(--surface) !important;

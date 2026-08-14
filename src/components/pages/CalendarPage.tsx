@@ -102,7 +102,7 @@ export default function CalendarPage({
       </div>
 
       {/* Legend */}
-      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-[1rem] text-slate-500">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" /> Deadline
         </span>
@@ -118,7 +118,7 @@ export default function CalendarPage({
       <div className="flex min-h-0 flex-1 gap-6">
         {/* Calendar grid */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="grid grid-cols-7 gap-1 pb-1 text-center text-xs text-slate-500">
+          <div className="grid grid-cols-7 gap-1 pb-1 text-center text-[1.1rem] text-slate-500">
             {WEEKDAYS.map((d) => (
               <div key={d}>{d}</div>
             ))}
@@ -147,7 +147,7 @@ export default function CalendarPage({
                   }`}
                 >
                   <span
-                    className={`text-xs font-medium ${
+                    className={`text-[1rem] font-medium ${
                       isToday ? "text-indigo-200" : "text-slate-400"
                     }`}
                   >
@@ -157,7 +157,7 @@ export default function CalendarPage({
                     {evs.slice(0, 3).map((e, idx) => (
                       <div
                         key={idx}
-                        className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
+                        className={`truncate rounded px-1 py-0.5 text-[1rem] leading-tight ${
                           e.kind === "interview"
                             ? "bg-amber-400/15 text-amber-200"
                             : "bg-indigo-500/15 text-indigo-200"
@@ -206,7 +206,7 @@ export default function CalendarPage({
                   Past ({past.length}
                   {past.length === RAIL_LIMIT ? "+" : ""})
                 </span>
-                <span className="text-xs">{showPast ? "▾" : "▸"}</span>
+                <span className="text-[1rem]">{showPast ? "▾" : "▸"}</span>
               </button>
               <AnimatePresence initial={false}>
                 {showPast && (
@@ -277,7 +277,7 @@ function DayPopup({
               <div className="text-sm text-slate-100">
                 {ev.job.title} · <span className="text-slate-400">{ev.job.company}</span>
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="text-[1rem] text-slate-500">
                 {ev.kind === "interview" ? "Interview" : "Application deadline"}
                 {ev.job.link && (
                   <>
@@ -318,7 +318,7 @@ function EventRow({
       } ${muted ? "opacity-60" : ""}`}
     >
       <div className="truncate text-slate-200">{ev.job.title}</div>
-      <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="flex items-center justify-between text-[1rem] text-slate-500">
         <span>{ev.job.company}</span>
         <span>
           {fmtDate(eventKey)}

@@ -16,12 +16,25 @@ import { useAuth } from "./auth/AuthContext";
 import StatsPage from "./components/pages/StatsPage";
 import JobsPage from "./components/pages/JobsPage";
 import CalendarPage from "./components/pages/CalendarPage";
+import ResumePage from "./components/pages/ResumePage";
 import AccountMenu from "./components/AccountMenu";
 import MembersModal from "./components/MembersModal";
 import CreateWorkspaceModal from "./components/CreateWorkspaceModal";
 import SignInPage from "./components/SignInPage";
 
+// Top-level navigation is two modes: the workspace-scoped application tracker,
+// and per-user Tools (the résumé builder, room to grow). Each mode owns its own
+// sub-tabs. See DESIGN.md §11.
+type Mode = "applications" | "tools";
 type Tab = "stats" | "jobs" | "calendar";
+type ToolTab = "resume";
+
+type NavTab = { id: string; label: string };
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: "applications", label: "Applications" },
+  { id: "tools", label: "Tools" },
+];
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "stats", label: "Stats", icon: "" },
@@ -29,8 +42,14 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "calendar", label: "Calendar", icon: "" },
 ];
 
+const TOOL_TABS: { id: ToolTab; label: string }[] = [
+  { id: "resume", label: "Résumé" },
+];
+
 export default function App() {
+  const [mode, setMode] = useState<Mode>("applications");
   const [tab, setTab] = useState<Tab>("jobs");
+  const [toolTab, setToolTab] = useState<ToolTab>("resume");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWs, setActiveWs] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -52,6 +71,8 @@ export default function App() {
   const canWrite = role !== "viewer";
   const activeWsName =
     workspaces.find((w) => w.id === activeWs)?.name ?? "Workspace";
+  const navTabs: NavTab[] = mode === "applications" ? TABS : TOOL_TABS;
+  const activeTabId = mode === "applications" ? tab : toolTab;
 
   // Track the signed-in user's role in the active workspace.
   useEffect(() => {
@@ -237,47 +258,67 @@ export default function App() {
     <div className="flex h-full flex-col">
       {/* Header: title + workspace switcher */}
       <header className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-2">
-          {/* <span className="text-xl"></span> */}
+        <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold tracking-tight text-slate-100">
-            Job Application Tracker
+            JobAppApp
           </h1>
+          {/* Top-level mode switch: Applications to Tools */}
+          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5">
+            {MODES.map((m) => {
+              const active = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-indigo-600 text-white"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500">Workspace</label>
-            <select
-              value={activeWs ?? ""}
-              onChange={(e) => setActiveWs(e.target.value)}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
-            >
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+          {/* Workspace controls are meaningful only for the workspace-scoped
+              Applications mode; the per-user Tools mode hides them. */}
+          {mode === "applications" && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500">Workspace</label>
+              <select
+                value={activeWs ?? ""}
+                onChange={(e) => setActiveWs(e.target.value)}
+                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
 
-            
-            <button
-              onClick={() => setShowCreateWs(true)}
-              title="New workspace"
-              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100"
-            >
-              ＋
-            </button>
-
-
-            {user && (
               <button
-                onClick={() => setShowMembers(true)}
-                title="Share / members"
+                onClick={() => setShowCreateWs(true)}
+                title="New workspace"
                 className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100"
               >
-                Workspace Settings
+                ＋
               </button>
-            )}
-          </div>
+
+              {user && (
+                <button
+                  onClick={() => setShowMembers(true)}
+                  title="Share / members"
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100"
+                >
+                  Workspace Settings
+                </button>
+              )}
+            </div>
+          )}
           {user && (
             <button
               onClick={syncNow}
@@ -316,20 +357,21 @@ export default function App() {
         </div>
       )}
 
-      {/* Tab bar */}
+      {/* Sub-tab bar for the active mode */}
       <nav className="flex gap-1 border-b border-slate-800 px-4">
-        {TABS.map((t) => {
-          const active = tab === t.id;
+        {navTabs.map((t) => {
+          const active = activeTabId === t.id;
           return (
             <button
               key={t.id}
-              onClick={() => setTab(t.id)}
+              onClick={() =>
+                mode === "applications"
+                  ? setTab(t.id as Tab)
+                  : setToolTab(t.id as ToolTab)
+              }
               className="relative px-4 py-3 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
             >
-              <span className={active ? "text-slate-100" : ""}>
-                {/*<span className="mr-1.5">{t.icon}</span>*/}
-                {t.label}
-              </span>
+              <span className={active ? "text-slate-100" : ""}>{t.label}</span>
               {active && (
                 <motion.div
                   layoutId="tab-underline"
@@ -346,17 +388,17 @@ export default function App() {
       <main className="relative flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
-            key={tab}
+            key={mode === "applications" ? tab : toolTab}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
             className="absolute inset-0 overflow-auto p-6"
           >
-            {activeWs && tab === "stats" && (
+            {mode === "applications" && activeWs && tab === "stats" && (
               <StatsPage workspaceId={activeWs} refreshKey={dataVersion} />
             )}
-            {activeWs && tab === "jobs" && (
+            {mode === "applications" && activeWs && tab === "jobs" && (
               <JobsPage
                 workspaceId={activeWs}
                 workspaceName={activeWsName}
@@ -364,8 +406,11 @@ export default function App() {
                 canWrite={canWrite}
               />
             )}
-            {activeWs && tab === "calendar" && (
+            {mode === "applications" && activeWs && tab === "calendar" && (
               <CalendarPage workspaceId={activeWs} refreshKey={dataVersion} />
+            )}
+            {mode === "tools" && toolTab === "resume" && (
+              <ResumePage userId={currentUserId} />
             )}
           </motion.div>
         </AnimatePresence>

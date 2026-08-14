@@ -153,6 +153,28 @@ create policy stages_update on public.stages
 create policy stages_delete on public.stages
   for delete using (public.can_write(workspace_id));
 
+-- Résumé profile: per-USER, not workspace-scoped (DESIGN.md §11). One row per
+-- user; the whole document lives in `data`. Self-ownership only — no sharing,
+-- no roles. id == user_id so both of a user's devices converge on one row.
+create table if not exists public.resume_profile (
+  id         uuid primary key,        -- == user_id
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  data       jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted    boolean not null default false,
+  unique (user_id)
+);
+alter table public.resume_profile enable row level security;
+create policy rp_select on public.resume_profile
+  for select using (user_id = auth.uid());
+create policy rp_insert on public.resume_profile
+  for insert with check (user_id = auth.uid());
+create policy rp_update on public.resume_profile
+  for update using (user_id = auth.uid());
+create policy rp_delete on public.resume_profile
+  for delete using (user_id = auth.uid());
+
 -- ---------------------------------------------------------------------------
 -- Sharing RPCs (memberships store only user_id; clients can't read auth.users)
 -- ---------------------------------------------------------------------------

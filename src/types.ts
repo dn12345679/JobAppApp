@@ -68,3 +68,98 @@ export type NewJobInput = Pick<JobApplication, "company" | "title"> &
   Partial<
     Omit<JobApplication, "id" | "workspaceId" | "createdAt" | "updatedAt">
   >;
+
+// ---- Résumé profile (DESIGN.md §11) -----------------------------------------
+// The Profile is per-USER (not per-workspace): the superset of career data. A
+// résumé is a *view* over it (selection + order + template + density). Stored as
+// one JSON document; every repeatable entry carries a stable `id` so the résumé
+// view can reference/hide/reorder it without copying content.
+
+export interface ContactInfo {
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  location: string | null; // "City, ST"
+  website: string | null;
+  linkedin: string | null;
+  github: string | null;
+  summary: string | null; // short headline / objective
+}
+
+export interface EducationEntry {
+  id: string;
+  school: string;
+  degree: string | null; // "B.S. Computer Science"
+  location: string | null;
+  startDate: string | null; // free text ok: "2022" / ISO
+  endDate: string | null; // "Present" allowed
+  gpa: string | null;
+  details: string[]; // bullets: honors, relevant coursework
+}
+
+export interface ExperienceEntry {
+  id: string;
+  company: string;
+  role: string;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null; // null / "Present"
+  bullets: string[];
+}
+
+export interface ProjectEntry {
+  id: string;
+  name: string;
+  link: string | null;
+  tech: string | null; // "React, Rust, SQLite"
+  startDate: string | null;
+  endDate: string | null;
+  bullets: string[];
+}
+
+export interface SkillGroup {
+  id: string;
+  label: string; // "Languages"
+  items: string[]; // ["TypeScript", "Rust"]
+}
+
+export type SectionKey =
+  | "summary"
+  | "experience"
+  | "education"
+  | "projects"
+  | "skills";
+
+export type ResumeTemplate = "classic" | "jake" | "twocol";
+export type ResumeDensity = "roomy" | "normal" | "tight";
+export type BulletStyle = "disc" | "circle" | "dash"; // filled dot / hollow / dash
+
+/** The résumé "view": how the Profile is arranged to fit one page. */
+export interface ResumeSettings {
+  template: ResumeTemplate;
+  density: ResumeDensity;
+  bulletStyle: BulletStyle;
+  fontScale: number; // clamped 0.9–1.1
+  sectionOrder: SectionKey[];
+  hidden: Record<string, boolean>; // entryId → excluded from the résumé
+  autoFit: boolean; // step density down until it fits (bounded)
+}
+
+export interface ResumeProfile {
+  id: string; // == userId (one row per user)
+  userId: string;
+  contact: ContactInfo;
+  education: EducationEntry[];
+  experience: ExperienceEntry[];
+  projects: ProjectEntry[];
+  skills: SkillGroup[];
+  settings: ResumeSettings;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The JSON payload stored in the `data` column (system fields live in columns). */
+export type ResumeProfileData = Pick<
+  ResumeProfile,
+  "contact" | "education" | "experience" | "projects" | "skills" | "settings"
+>;

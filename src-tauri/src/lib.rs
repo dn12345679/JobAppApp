@@ -30,6 +30,12 @@ pub fn run() {
             sql: include_str!("../migrations/0004_stages.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "add resume_profile table",
+            sql: include_str!("../migrations/0005_resume_profile.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

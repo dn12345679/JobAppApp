@@ -11,6 +11,26 @@ export function isInterviewStage(label: string | null): boolean {
   return !!label && label.toLowerCase().includes("interview");
 }
 
+/**
+ * A derived condition (not a stored state): the job had an application deadline
+ * that has passed while it was never applied to. Computed from existing fields
+ * so it's always accurate and needs no migration — see the `outcome` follow-up
+ * in DESIGN.md for making this an explicit, user-set closed outcome.
+ *
+ * `now` is injectable for testing; defaults to the current date.
+ */
+export function isMissedDeadline(
+  job: Pick<JobApplication, "state" | "deadline" | "dateApplied">,
+  now: Date = new Date(),
+): boolean {
+  if (job.state !== "NotApplied") return false;
+  if (job.dateApplied) return false;
+  if (!job.deadline) return false;
+  // Compare on date only: a deadline is "missed" the day *after* it passes.
+  const today = now.toISOString().slice(0, 10);
+  return job.deadline < today;
+}
+
 export const FLAG_OPTIONS: { value: Flag; label: string }[] = [
   { value: "red", label: "Apply now" },
   { value: "yellow", label: "Apply within 1 week" },

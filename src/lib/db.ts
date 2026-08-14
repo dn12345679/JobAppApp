@@ -1,8 +1,13 @@
 import Database from "@tauri-apps/plugin-sql";
 import type {
+  ContactInfo,
   JobApplication,
   NewJobInput,
+  ResumeProfile,
+  ResumeProfileData,
+  ResumeSettings,
   Role,
+  SectionKey,
   Workspace,
   WorkspaceStage,
 } from "../types";
@@ -127,6 +132,7 @@ export async function clearLocalData(): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM job_applications");
   await db.execute("DELETE FROM stages");
+  await db.execute("DELETE FROM resume_profile");
   await db.execute("DELETE FROM memberships");
   await db.execute("DELETE FROM workspaces");
   ensurePromise = null; // allow a fresh seed for the new account
@@ -457,4 +463,136 @@ export async function restoreJob(id: string): Promise<void> {
     "UPDATE job_applications SET deleted = 0, dirty = 1, updated_at = $2 WHERE id = $1",
     [id, now()],
   );
+}
+
+// ---- résumé profile (per-user, one row; DESIGN.md §11) ----------------------
+
+const DEFAULT_SECTION_ORDER: SectionKey[] = [
+  "summary",
+  "experience",
+  "education",
+  "projects",
+  "skills",
+];
+
+function defaultResumeSettings(): ResumeSettings {
+  return {
+    template: "classic",
+    density: "normal",
+    bulletStyle: "disc",
+    fontScale: 1,
+    sectionOrder: [...DEFAULT_SECTION_ORDER],
+    hidden: {},
+    autoFit: false,
+  };
+}
+
+function emptyContact(): ContactInfo {
+  return {
+    fullName: "",
+    email: null,
+    phone: null,
+    location: null,
+    website: null,
+    linkedin: null,
+    github: null,
+    summary: null,
+  };
+}
+
+function defaultResumeProfile(userId: string, ts: string): ResumeProfile {
+  return {
+    id: userId,
+    userId,
+    contact: emptyContact(),
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    settings: defaultResumeSettings(),
+    createdAt: ts,
+    updatedAt: ts,
+  };
+}
+
+/** The JSON payload for the `data` column — everything except system fields. */
+function toProfileData(p: ResumeProfile): ResumeProfileData {
+  return {
+    contact: p.contact,
+    education: p.education,
+    experience: p.experience,
+    projects: p.projects,
+    skills: p.skills,
+    settings: p.settings,
+  };
+}
+
+function safeParseProfileData(raw: unknown): Partial<ResumeProfileData> {
+  if (typeof raw !== "string") return {};
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === "object" ? (v as Partial<ResumeProfileData>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function rowToResumeProfile(r: JobRow): ResumeProfile {
+  const d = safeParseProfileData(r.data);
+  return {
+    id: r.id as string,
+    userId: r.user_id as string,
+    // Merge with defaults so a document written by an older/newer build (missing
+    // or extra keys) always yields a fully-populated, well-typed profile.
+    contact: { ...emptyContact(), ...(d.contact ?? {}) },
+    education: Array.isArray(d.education) ? d.education : [],
+    experience: Array.isArray(d.experience) ? d.experience : [],
+    projects: Array.isArray(d.projects) ? d.projects : [],
+    skills: Array.isArray(d.skills) ? d.skills : [],
+    settings: { ...defaultResumeSettings(), ...(d.settings ?? {}) },
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+/**
+ * The current user's résumé profile, seeding an empty one on first run (like
+ * ensureDefaultWorkspace). Only one profile row exists per device — the local
+ * cache holds a single user, wiped on account switch — so we read the sole row
+ * rather than filter by id. INSERT OR IGNORE makes the seed race-safe under
+ * StrictMode's double-invoked effects.
+ */
+export async function getResumeProfile(
+  userId: string = LOCAL_USER_ID,
+): Promise<ResumeProfile> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM resume_profile WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+  );
+  if (rows.length > 0) return rowToResumeProfile(rows[0]);
+
+  const ts = now();
+  const profile = defaultResumeProfile(userId, ts);
+  await db.execute(
+    `INSERT OR IGNORE INTO resume_profile (id, user_id, data, created_at, updated_at, dirty, deleted)
+     VALUES ($1, $2, $3, $4, $4, 1, 0)`,
+    [profile.id, profile.userId, JSON.stringify(toProfileData(profile)), ts],
+  );
+  const seeded = await db.select<JobRow[]>(
+    "SELECT * FROM resume_profile WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+  );
+  return seeded.length ? rowToResumeProfile(seeded[0]) : profile;
+}
+
+/** Persists the whole profile document and marks it dirty for the next sync. */
+export async function saveResumeProfile(
+  profile: ResumeProfile,
+): Promise<ResumeProfile> {
+  const db = await getDb();
+  const updated = { ...profile, updatedAt: now() };
+  await db.execute(
+    "UPDATE resume_profile SET data = $2, updated_at = $3, dirty = 1 WHERE id = $1",
+    [updated.id, JSON.stringify(toProfileData(updated)), updated.updatedAt],
+  );
+  return updated;
 }

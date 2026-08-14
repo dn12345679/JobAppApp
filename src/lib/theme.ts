@@ -15,6 +15,7 @@ export const THEMES: ThemeDef[] = [
   { id: "light", label: "Light", swatch: "#4f46e5" },
   { id: "butter", label: "Butter", swatch: "#deb53a" },
   { id: "sakura", label: "Sakura", swatch: "#db4f8a" },
+  { id: "aero", label: "Aero", swatch: "#2b8fd8" },
 ];
 
 const KEY = "ui-theme";
