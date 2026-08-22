@@ -160,14 +160,18 @@ create policy stages_delete on public.stages
 -- Résumé profile: per-USER, not workspace-scoped (DESIGN.md §11). One row per
 -- user; the whole document lives in `data`. Self-ownership only — no sharing,
 -- no roles. id == user_id so both of a user's devices converge on one row.
+-- Multi-résumé: a user may own several rows. Existing installs kept id == user_id
+-- for their first résumé; new résumés get their own uuid. RLS is user-scoped so
+-- it needs no change. (Migration for existing projects: drop the old
+-- `unique (user_id)` constraint and add the `name` column — see PROJECT_SUMMARY.)
 create table if not exists public.resume_profile (
-  id         uuid primary key,        -- == user_id
+  id         uuid primary key,        -- own uuid (legacy rows: == user_id)
   user_id    uuid not null references auth.users (id) on delete cascade,
+  name       text,                    -- user label; NULL → default in the client
   data       jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted    boolean not null default false,
-  unique (user_id)
+  deleted    boolean not null default false
 );
 alter table public.resume_profile enable row level security;
 create policy rp_select on public.resume_profile

@@ -25,7 +25,8 @@ export default function AccountMenu({
   }
 
   return (
-    <div className="relative z-30">
+    // z-40: above the résumé File/Edit band (z-30) but below modal backdrops (z-50).
+    <div className="relative z-40">
       <button
         onClick={() => setShowMenu((v) => !v)}
         className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:border-slate-600"

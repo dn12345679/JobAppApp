@@ -36,6 +36,12 @@ pub fn run() {
             sql: include_str!("../migrations/0005_resume_profile.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "add resume name (multi-résumé)",
+            sql: include_str!("../migrations/0006_resume_multi.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

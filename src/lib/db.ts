@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import { BaseDirectory, remove } from "@tauri-apps/plugin-fs";
+import { supabase } from "./supabase";
 import type {
   ContactInfo,
   JobApplication,
@@ -512,19 +513,24 @@ const DEFAULT_SECTION_ORDER: SectionKey[] = [
   "skills",
 ];
 
-function defaultResumeSettings(): ResumeSettings {
+export function defaultResumeSettings(): ResumeSettings {
   return {
     template: "classic",
     density: "normal",
     bulletStyle: "disc",
     fontScale: 1,
+    sectionSpacing: 0,
+    bulletSpacing: 0,
     sectionOrder: [...DEFAULT_SECTION_ORDER],
     hidden: {},
     autoFit: false,
   };
 }
 
-function emptyContact(): ContactInfo {
+/** Default label for a résumé whose `name` column is NULL (e.g. legacy rows). */
+export const DEFAULT_RESUME_NAME = "My résumé";
+
+export function emptyContact(): ContactInfo {
   return {
     fullName: "",
     email: null,
@@ -537,10 +543,17 @@ function emptyContact(): ContactInfo {
   };
 }
 
-function defaultResumeProfile(userId: string, ts: string): ResumeProfile {
+function defaultResumeProfile(
+  userId: string,
+  ts: string,
+  opts?: { id?: string; name?: string },
+): ResumeProfile {
   return {
-    id: userId,
+    // Legacy behaviour: the very first résumé keeps id == userId so both the
+    // user's devices converge on the same row. Extra résumés pass their own uuid.
+    id: opts?.id ?? userId,
     userId,
+    name: opts?.name ?? DEFAULT_RESUME_NAME,
     contact: emptyContact(),
     education: [],
     experience: [],
@@ -579,6 +592,8 @@ function rowToResumeProfile(r: JobRow): ResumeProfile {
   return {
     id: r.id as string,
     userId: r.user_id as string,
+    // `name` is nullable (legacy rows predate it) — fall back to a default label.
+    name: ((r.name as string) ?? "").trim() || DEFAULT_RESUME_NAME,
     // Merge with defaults so a document written by an older/newer build (missing
     // or extra keys) always yields a fully-populated, well-typed profile.
     contact: { ...emptyContact(), ...(d.contact ?? {}) },
@@ -592,33 +607,170 @@ function rowToResumeProfile(r: JobRow): ResumeProfile {
   };
 }
 
-/**
- * The current user's résumé profile, seeding an empty one on first run (like
- * ensureDefaultWorkspace). Only one profile row exists per device — the local
- * cache holds a single user, wiped on account switch — so we read the sole row
- * rather than filter by id. INSERT OR IGNORE makes the seed race-safe under
- * StrictMode's double-invoked effects.
- */
-export async function getResumeProfile(
+/** All of a user's live (non-trashed) résumés, oldest first. */
+export async function listResumes(
   userId: string = LOCAL_USER_ID,
-): Promise<ResumeProfile> {
+): Promise<ResumeProfile[]> {
   const db = await getDb();
   const rows = await db.select<JobRow[]>(
-    "SELECT * FROM resume_profile WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+    "SELECT * FROM resume_profile WHERE user_id = $1 AND deleted = 0 ORDER BY created_at ASC",
+    [userId],
   );
-  if (rows.length > 0) return rowToResumeProfile(rows[0]);
+  return rows.map(rowToResumeProfile);
+}
 
+/** Soft-deleted résumés for the Trash view (most-recently-deleted first). */
+export async function listTrashedResumes(
+  userId: string = LOCAL_USER_ID,
+): Promise<ResumeProfile[]> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM resume_profile WHERE user_id = $1 AND deleted = 1 ORDER BY updated_at DESC",
+    [userId],
+  );
+  return rows.map(rowToResumeProfile);
+}
+
+/** A single résumé by id, or null if it doesn't exist (or is trashed). */
+export async function getResume(id: string): Promise<ResumeProfile | null> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM resume_profile WHERE id = $1 AND deleted = 0 LIMIT 1",
+    [id],
+  );
+  return rows.length ? rowToResumeProfile(rows[0]) : null;
+}
+
+/**
+ * Returns the user's résumés, seeding a first default one if none exist yet (the
+ * legacy row keeps id == userId; see defaultResumeProfile). Used on first load
+ * and whenever the collection is emptied. INSERT OR IGNORE keeps the seed
+ * race-safe under StrictMode's double-invoked effects.
+ */
+export async function ensureAtLeastOneResume(
+  userId: string = LOCAL_USER_ID,
+): Promise<ResumeProfile[]> {
+  const existing = await listResumes(userId);
+  if (existing.length > 0) return existing;
+  await createResume(userId, { seedId: userId });
+  return listResumes(userId);
+}
+
+function insertResume(profile: ResumeProfile): Promise<unknown> {
+  return getDb().then((db) =>
+    db.execute(
+      `INSERT OR IGNORE INTO resume_profile (id, user_id, name, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $5, 1, 0)`,
+      [
+        profile.id,
+        profile.userId,
+        profile.name,
+        JSON.stringify(toProfileData(profile)),
+        profile.createdAt,
+      ],
+    ),
+  );
+}
+
+/**
+ * Creates a new résumé. Blank by default; `template` pre-selects a layout.
+ * `seedId` is used only by the first-run seed to keep id == userId.
+ */
+export async function createResume(
+  userId: string = LOCAL_USER_ID,
+  opts?: { name?: string; template?: ResumeProfile["settings"]["template"]; seedId?: string },
+): Promise<ResumeProfile> {
   const ts = now();
-  const profile = defaultResumeProfile(userId, ts);
+  const profile = defaultResumeProfile(userId, ts, {
+    id: opts?.seedId ?? uuid(),
+    name: opts?.name,
+  });
+  if (opts?.template) profile.settings.template = opts.template;
+  await insertResume(profile);
+  return profile;
+}
+
+/**
+ * Duplicates an existing résumé into a new row (own uuid, own name), optionally
+ * switching the template. The whole document is deep-copied so edits don't leak
+ * back to the source.
+ */
+export async function copyResume(
+  sourceId: string,
+  opts?: { name?: string; template?: ResumeProfile["settings"]["template"] },
+): Promise<ResumeProfile> {
+  const source = await getResume(sourceId);
+  if (!source) throw new Error("copyResume: source résumé not found");
+  const ts = now();
+  const copy: ResumeProfile = {
+    ...structuredClone(source),
+    id: uuid(),
+    name: opts?.name ?? `${source.name} (copy)`,
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  if (opts?.template) copy.settings.template = opts.template;
+  await insertResume(copy);
+  return copy;
+}
+
+/**
+ * Inserts a fully-formed résumé produced by the import sanitizer (its id/userId/
+ * name/timestamps are already set). Marks it dirty so it syncs like any other.
+ */
+export async function importResumeProfile(
+  profile: ResumeProfile,
+): Promise<ResumeProfile> {
+  await insertResume(profile);
+  return profile;
+}
+
+/** Renames a résumé and marks it dirty for the next sync. */
+export async function renameResume(
+  id: string,
+  name: string,
+): Promise<void> {
+  const db = await getDb();
   await db.execute(
-    `INSERT OR IGNORE INTO resume_profile (id, user_id, data, created_at, updated_at, dirty, deleted)
-     VALUES ($1, $2, $3, $4, $4, 1, 0)`,
-    [profile.id, profile.userId, JSON.stringify(toProfileData(profile)), ts],
+    "UPDATE resume_profile SET name = $2, updated_at = $3, dirty = 1 WHERE id = $1",
+    [id, name.trim() || DEFAULT_RESUME_NAME, now()],
   );
-  const seeded = await db.select<JobRow[]>(
-    "SELECT * FROM resume_profile WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+}
+
+/** Soft-delete (tombstone) a résumé so the deletion syncs; recoverable in Trash. */
+export async function softDeleteResume(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE resume_profile SET deleted = 1, dirty = 1, updated_at = $2 WHERE id = $1",
+    [id, now()],
   );
-  return seeded.length ? rowToResumeProfile(seeded[0]) : profile;
+}
+
+/** Un-delete: clears the tombstone and marks dirty so the restore syncs up. */
+export async function restoreResume(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE resume_profile SET deleted = 0, dirty = 1, updated_at = $2 WHERE id = $1",
+    [id, now()],
+  );
+}
+
+/**
+ * Permanently removes a résumé — from Supabase first (so a later pull can't
+ * resurrect it), then locally. Irreversible; only reachable from the Trash's
+ * "Delete permanently" action. If offline the server row can't be removed, so
+ * we surface an error rather than delete locally and have it reappear.
+ */
+export async function permanentlyDeleteResume(id: string): Promise<void> {
+  if (supabase) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      const { error } = await supabase.from("resume_profile").delete().eq("id", id);
+      if (error) throw new Error(`permanent delete failed: ${error.message}`);
+    }
+  }
+  const db = await getDb();
+  await db.execute("DELETE FROM resume_profile WHERE id = $1", [id]);
 }
 
 /** Persists the whole profile document and marks it dirty for the next sync. */

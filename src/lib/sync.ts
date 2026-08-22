@@ -79,14 +79,21 @@ export async function syncAll(): Promise<SyncResult> {
     "DELETE FROM memberships WHERE workspace_id NOT IN (SELECT id FROM workspaces)",
   );
 
-  // Adopt an offline-seeded résumé profile (id/user_id 'local') for this user.
-  // OR IGNORE skips the rename if a row for this uid already exists; the delete
-  // then clears any leftover local seed. The profile is per-user (DESIGN.md §11).
+  // Adopt any offline-seeded résumés (user_id 'local') for this signed-in user.
+  // With multi-résumé, each row keeps its own id — we only rewrite the owner —
+  // so several offline résumés all survive login instead of collapsing into one.
+  // The one legacy exception: a first-run seed created with id == 'local' would
+  // collide with nothing, but to preserve the historical "first résumé shares the
+  // user id" convention we re-key that single seed to the uid; extra rows (uuid
+  // ids) keep theirs.
   await db.execute(
-    "UPDATE OR IGNORE resume_profile SET id = $1, user_id = $1, dirty = 1 WHERE user_id = 'local'",
+    "UPDATE OR IGNORE resume_profile SET id = $1, user_id = $1, dirty = 1 WHERE user_id = 'local' AND id = 'local'",
     [uid],
   );
-  await db.execute("DELETE FROM resume_profile WHERE user_id = 'local'");
+  await db.execute(
+    "UPDATE resume_profile SET user_id = $1, dirty = 1 WHERE user_id = 'local'",
+    [uid],
+  );
 
   // 2. PUSH all workspaces we own (not just dirty) so every membership's FK
   //    target is guaranteed to exist on the server before step 3.
@@ -182,6 +189,7 @@ export async function syncAll(): Promise<SyncResult> {
       dirtyProfiles.map((p) => ({
         id: p.id,
         user_id: p.user_id,
+        name: p.name ?? null,
         data: parseJson(p.data),
         created_at: p.created_at,
         updated_at: p.updated_at,
@@ -273,14 +281,14 @@ export async function syncAll(): Promise<SyncResult> {
   async function upsertResumeProfileLocal(p: Row) {
     // `data` arrives as a jsonb object; store it as TEXT locally.
     await db.execute(
-      `INSERT INTO resume_profile (id, user_id, data, created_at, updated_at, dirty, deleted)
-       VALUES ($1, $2, $3, $4, $5, 0, $6)
+      `INSERT INTO resume_profile (id, user_id, name, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
        ON CONFLICT(id) DO UPDATE SET
-         user_id = excluded.user_id, data = excluded.data,
+         user_id = excluded.user_id, name = excluded.name, data = excluded.data,
          updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
        WHERE excluded.updated_at >= resume_profile.updated_at`,
       [
-        p.id, p.user_id, JSON.stringify(p.data ?? {}),
+        p.id, p.user_id, p.name ?? null, JSON.stringify(p.data ?? {}),
         p.created_at, p.updated_at, bool01(p.deleted),
       ],
     );

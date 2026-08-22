@@ -11,8 +11,13 @@
     "sql:allow-select",
     "sql:allow-close",
     "dialog:allow-save",
+    "dialog:allow-open",
     {
       "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
       "allow": [{ "path": "$HOME/**" }]
     },
     {

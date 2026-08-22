@@ -140,14 +140,17 @@ export interface ResumeSettings {
   density: ResumeDensity;
   bulletStyle: BulletStyle;
   fontScale: number; // clamped 0.9–1.1
+  sectionSpacing: number; // px added/removed to the gap between sections (Edit menu)
+  bulletSpacing: number; // px added/removed to the gap between bullets (Edit menu)
   sectionOrder: SectionKey[];
   hidden: Record<string, boolean>; // entryId → excluded from the résumé
   autoFit: boolean; // step density down until it fits (bounded)
 }
 
 export interface ResumeProfile {
-  id: string; // == userId (one row per user)
+  id: string; // own uuid; legacy single-résumé rows have id == userId
   userId: string;
+  name: string; // user-facing label, e.g. "Backend SWE"
   contact: ContactInfo;
   education: EducationEntry[];
   experience: ExperienceEntry[];

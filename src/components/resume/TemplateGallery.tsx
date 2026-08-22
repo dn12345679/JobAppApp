@@ -35,6 +35,7 @@ const TEMPLATES_META: {
 const SAMPLE: ResumeProfile = {
   id: "sample",
   userId: "sample",
+  name: "Sample",
   contact: {
     fullName: "Nylad Guyen",
     email: "Nylad@email.com",
@@ -91,6 +92,8 @@ const SAMPLE: ResumeProfile = {
     density: "normal",
     bulletStyle: "disc",
     fontScale: 1,
+    sectionSpacing: 0,
+    bulletSpacing: 0,
     sectionOrder: ["summary", "experience", "education", "projects", "skills"],
     hidden: {},
     autoFit: false,

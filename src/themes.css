@@ -238,8 +238,13 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* Windows 7 "gel" primary buttons: a top sheen over a blue vertical gradient. */
+/* Windows 7 "gel" primary buttons: a top sheen over a blue vertical gradient.
+   The gel fills any element whose class contains `bg-indigo-600` — including
+   dropdown items that use it only as a `hover:` background (e.g. the résumé
+   File/Edit menu), which end up gel-blue at rest too. Force white text here so
+   ALL gel buttons read consistently, matching those that hard-code text-white. */
 :root[data-theme="aero"] [class*="bg-indigo-600"] {
+  color: #fff;
   background-image:
     linear-gradient(
       180deg,

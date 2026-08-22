@@ -77,6 +77,8 @@ type BodyProps = {
   order: SectionKey[];
   base: number;
   bullet: BulletStyle;
+  sectionGap: number; // px added to the gap after each section (Edit ▸ spacing)
+  bulletGap: number; // px added to the gap after each bullet (Edit ▸ spacing)
   experience: ExperienceEntry[];
   education: EducationEntry[];
   projects: ProjectEntry[];
@@ -179,14 +181,6 @@ export default function ResumePreview({
             Reset
           </button>
         </div>
-
-        <button
-          onClick={() => window.print()}
-          title="Export to PDF — opens the print dialog; choose “Save as PDF”"
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
-        >
-          Export PDF
-        </button>
       </div>
 
       {/* Scaled page. The spacer sizes to the scaled footprint so scrolling and
@@ -240,6 +234,10 @@ export const Sheet = ({
   const order = settings.sectionOrder?.length ? settings.sectionOrder : DEFAULT_ORDER;
   const tpl = TEMPLATES[settings.template] ?? TEMPLATES.classic;
   const base = tpl.base * (settings.fontScale || 1);
+  // Spacing deltas from the Edit menu, clamped so a section/bullet never collapses
+  // into the next or pushes absurdly far apart.
+  const sectionGap = Math.max(-6, Math.min(24, settings.sectionSpacing || 0));
+  const bulletGap = Math.max(-1, Math.min(10, settings.bulletSpacing || 0));
 
   const experience = profile.experience.filter((e) => !hidden[e.id]);
   const education = profile.education.filter((e) => !hidden[e.id]);
@@ -259,6 +257,8 @@ export const Sheet = ({
     order,
     base,
     bullet: settings.bulletStyle ?? "disc",
+    sectionGap,
+    bulletGap,
     experience,
     education,
     projects,
@@ -322,10 +322,16 @@ function TitleRow({
   );
 }
 
-const bulletList = (items: string[], base: number, bullet: BulletStyle) => {
+const bulletList = (
+  items: string[],
+  base: number,
+  bullet: BulletStyle,
+  gap = 0,
+) => {
   const visible = items.map((b) => b.trim()).filter(Boolean);
   if (!visible.length) return null;
   const dash = bullet === "dash";
+  const mb = Math.max(0, 1.5 + gap);
   return (
     <ul
       style={{
@@ -340,8 +346,8 @@ const bulletList = (items: string[], base: number, bullet: BulletStyle) => {
           key={i}
           style={
             dash
-              ? { marginBottom: 1.5, paddingLeft: 14, textIndent: -14 }
-              : { marginBottom: 1.5 }
+              ? { marginBottom: mb, paddingLeft: 14, textIndent: -14 }
+              : { marginBottom: mb }
           }
         >
           {dash ? "–  " : null}
@@ -418,6 +424,8 @@ function ClassicBody({
   order,
   base,
   bullet,
+  sectionGap,
+  bulletGap,
   experience,
   education,
   projects,
@@ -433,7 +441,7 @@ function ClassicBody({
     title: string;
     children: React.ReactNode;
   }) => (
-    <section style={{ marginBottom: 14 }}>
+    <section style={{ marginBottom: 14 + sectionGap }}>
       <h2
         style={{
           fontSize: base * 0.82,
@@ -495,7 +503,7 @@ function ClassicBody({
                       {e.location}
                     </div>
                   )}
-                  {bulletList(e.bullets, base, bullet)}
+                  {bulletList(e.bullets, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
@@ -516,7 +524,7 @@ function ClassicBody({
                       {e.gpa ? `GPA ${e.gpa}` : ""}
                     </div>
                   )}
-                  {bulletList(e.details, base, bullet)}
+                  {bulletList(e.details, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
@@ -535,7 +543,7 @@ function ClassicBody({
                     }
                     right={dateRange(p.startDate, p.endDate)}
                   />
-                  {bulletList(p.bullets, base, bullet)}
+                  {bulletList(p.bullets, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
@@ -572,11 +580,14 @@ function TwoColumnBody({
   order,
   base,
   bullet,
+  sectionGap,
+  bulletGap,
   experience,
   education,
   projects,
   skills,
 }: BodyProps) {
+  const sMb = 12 + sectionGap; // shared section gap for this template
   const heading = (t: string) => (
     <div
       style={{
@@ -599,7 +610,7 @@ function TwoColumnBody({
   const renderSection = (key: SectionKey) => {
     if (key === "summary")
       return contact.summary?.trim() ? (
-        <section key={key} style={{ marginBottom: 12 }}>
+        <section key={key} style={{ marginBottom: sMb }}>
           {heading("Summary")}
           <p style={{ margin: 0 }}>{contact.summary}</p>
         </section>
@@ -607,7 +618,7 @@ function TwoColumnBody({
 
     if (key === "experience")
       return experience.length ? (
-        <section key={key} style={{ marginBottom: 12 }}>
+        <section key={key} style={{ marginBottom: sMb }}>
           {heading("Experience")}
           {experience.map((e) => (
             <div key={e.id} style={{ marginBottom: 9 }}>
@@ -623,7 +634,7 @@ function TwoColumnBody({
               {e.location?.trim() && (
                 <div style={{ color: MUTED, fontStyle: "italic" }}>{e.location}</div>
               )}
-              {bulletList(e.bullets, base, bullet)}
+              {bulletList(e.bullets, base, bullet, bulletGap)}
             </div>
           ))}
         </section>
@@ -631,7 +642,7 @@ function TwoColumnBody({
 
     if (key === "projects")
       return projects.length ? (
-        <section key={key} style={{ marginBottom: 12 }}>
+        <section key={key} style={{ marginBottom: sMb }}>
           {heading("Projects")}
           {projects.map((p) => (
             <div key={p.id} style={{ marginBottom: 9 }}>
@@ -644,7 +655,7 @@ function TwoColumnBody({
                   {dateRange(p.startDate, p.endDate)}
                 </span>
               </div>
-              {bulletList(p.bullets, base, bullet)}
+              {bulletList(p.bullets, base, bullet, bulletGap)}
             </div>
           ))}
         </section>
@@ -652,7 +663,7 @@ function TwoColumnBody({
 
     if (key === "education")
       return education.length ? (
-        <section key={key} style={{ marginBottom: 12 }}>
+        <section key={key} style={{ marginBottom: sMb }}>
           {heading("Education")}
           {education.map((e) => (
             <div key={e.id} style={{ marginBottom: 8 }}>
@@ -669,7 +680,7 @@ function TwoColumnBody({
 
     if (key === "skills")
       return skills.length ? (
-        <section key={key} style={{ marginBottom: 12 }}>
+        <section key={key} style={{ marginBottom: sMb }}>
           {heading("Skills")}
           {skills.map((g) => {
             const items = g.items.map((s) => s.trim()).filter(Boolean);
@@ -736,6 +747,8 @@ function JakeBody({
   order,
   base,
   bullet,
+  sectionGap,
+  bulletGap,
   experience,
   education,
   projects,
@@ -751,7 +764,7 @@ function JakeBody({
     title: string;
     children: React.ReactNode;
   }) => (
-    <section style={{ marginBottom: 8 }}>
+    <section style={{ marginBottom: 8 + sectionGap }}>
       <div
         style={{
           fontVariant: "small-caps",
@@ -837,7 +850,7 @@ function JakeBody({
                     right={dateRange(e.startDate, e.endDate)}
                   />
                   <SubLine left={e.company} right={e.location ?? ""} italic />
-                  {bulletList(e.bullets, base, bullet)}
+                  {bulletList(e.bullets, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
@@ -862,7 +875,7 @@ function JakeBody({
                     right={dateRange(e.startDate, e.endDate)}
                     italic
                   />
-                  {bulletList(e.details, base, bullet)}
+                  {bulletList(e.details, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
@@ -888,7 +901,7 @@ function JakeBody({
                     }
                     right={dateRange(p.startDate, p.endDate)}
                   />
-                  {bulletList(p.bullets, base, bullet)}
+                  {bulletList(p.bullets, base, bullet, bulletGap)}
                 </div>
               ))}
             </Section>
