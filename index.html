@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover exposes the env(safe-area-inset-*) values so the app
+         can pad around the status/navigation bars (see index.css). user-scalable=no
+         + maximum-scale=1 disable native pinch/double-tap zoom so scaling is only
+         via the in-app Zoom control (documentElement.style.zoom, unaffected). -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title></title>
   </head>
 

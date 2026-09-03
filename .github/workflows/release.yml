@@ -124,6 +124,15 @@ jobs:
           export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           npx tauri android init
 
+      - name: Apply native overrides (edge-to-edge + no WebView zoom)
+        run: |
+          set -euo pipefail
+          MA=$(find src-tauri/gen/android -name MainActivity.kt | head -1)
+          if [ -z "$MA" ]; then echo "MainActivity.kt not found"; exit 1; fi
+          echo "Overriding $MA"
+          cp src-tauri/android-overrides/MainActivity.kt "$MA"
+          cat "$MA"
+
       - name: Build the APK
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

@@ -18,6 +18,19 @@ export default function AccountMenu({
   const { user, signOut } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
   const [theme, setTheme] = useState(getSavedTheme());
+  const [checking, setChecking] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+
+  async function runUpdateCheck() {
+    setChecking(true);
+    setUpdateMsg(null);
+    const r = await checkForUpdate();
+    setChecking(false);
+    if (r.kind === "uptodate") setUpdateMsg("You’re on the latest version.");
+    else if (r.kind === "declined") setUpdateMsg(`Update ${r.version} is available.`);
+    else if (r.kind === "error") setUpdateMsg("Couldn’t check — try again later.");
+    // "installing" → the app relaunches, so no message needed.
+  }
 
   function pickTheme(id: string) {
     applyTheme(id);
@@ -114,14 +127,21 @@ export default function AccountMenu({
 
               <div className="my-1 border-t border-slate-700" />
               <button
-                onClick={async () => {
-                  setShowMenu(false);
-                  await checkForUpdate();
-                }}
-                className="w-full rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700"
+                onClick={runUpdateCheck}
+                disabled={checking}
+                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-70"
               >
-                Check for updates
+                <span>Check for updates</span>
+                {checking && (
+                  <span
+                    aria-label="Checking"
+                    className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-500 border-t-indigo-400"
+                  />
+                )}
               </button>
+              {updateMsg && (
+                <div className="px-2 pb-1 text-xs text-slate-500">{updateMsg}</div>
+              )}
               {user && (
                 <button
                   onClick={async () => {
