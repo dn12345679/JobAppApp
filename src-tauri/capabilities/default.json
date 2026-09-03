@@ -23,8 +23,6 @@
     {
       "identifier": "fs:allow-remove",
       "allow": [{ "path": "$APPCONFIG/jobtracker.db*" }]
-    },
-    "updater:default",
-    "process:allow-restart"
+    }
   ]
 }

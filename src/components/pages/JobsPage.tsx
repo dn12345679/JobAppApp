@@ -49,6 +49,7 @@ export default function JobsPage({
   const [showExport, setShowExport] = useState(false);
   const [showStages, setShowStages] = useState(false);
   const [stages, setStages] = useState<WorkspaceStage[]>([]);
+  const [showFilters, setShowFilters] = useState(false); // mobile filter drawer
 
   async function refresh() {
     setJobs(await listJobs(workspaceId));
@@ -120,10 +121,75 @@ export default function JobsPage({
     }
   }
 
+  // Number of filters narrowing the list (shown as a badge on the mobile drawer).
+  const activeFilterCount =
+    (stateFilter !== "all" ? 1 : 0) +
+    (range !== "all" ? 1 : 0) +
+    (hideMissed ? 1 : 0) +
+    activeTags.length;
+
+  // The full filter set, reused inline on desktop and inside the mobile drawer.
+  const filterControls = (
+    <>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Chip active={stateFilter === "all"} onClick={() => setStateFilter("all")}>
+          All
+        </Chip>
+        {(["NotApplied", "InProgress", "Applied"] as ApplicationState[]).map((s) => (
+          <Chip key={s} active={stateFilter === s} onClick={() => setStateFilter(s)}>
+            {STATE_LABELS[s]}
+          </Chip>
+        ))}
+        <Chip
+          active={stateFilter === "missed"}
+          onClick={() => setStateFilter("missed")}
+        >
+          Missed deadline
+        </Chip>
+        <span className="mx-1 h-4 w-px bg-slate-700" />
+        {(["all", "week", "month", "custom"] as DateRange[]).map((r) => (
+          <Chip key={r} active={range === r} onClick={() => setRange(r)}>
+            {r === "all" ? "Any date" : r === "week" ? "Past week" : r === "month" ? "Past month" : "Custom"}
+          </Chip>
+        ))}
+        {range === "custom" && (
+          <span className="flex items-center gap-1">
+            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
+            <span className="text-slate-500">to</span>
+            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
+          </span>
+        )}
+        <span className="mx-1 h-4 w-px bg-slate-700" />
+        <Chip active={hideMissed} onClick={() => setHideMissed((v) => !v)}>
+          {hideMissed ? "✓ " : ""}Hide missed
+        </Chip>
+      </div>
+
+      {allTags.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-slate-500">Tags:</span>
+          {allTags.map((t) => (
+            <Chip
+              key={t}
+              active={activeTags.includes(t)}
+              onClick={() =>
+                setActiveTags((prev) =>
+                  prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+                )
+              }
+            >
+              {t}
+            </Chip>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       {/* Search + sort */}
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 md:gap-3">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -206,62 +272,37 @@ export default function JobsPage({
         </div>
       )}
 
-      {/* Filters */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <Chip active={stateFilter === "all"} onClick={() => setStateFilter("all")}>
-          All
-        </Chip>
-        {(["NotApplied", "InProgress", "Applied"] as ApplicationState[]).map((s) => (
-          <Chip key={s} active={stateFilter === s} onClick={() => setStateFilter(s)}>
-            {STATE_LABELS[s]}
-          </Chip>
-        ))}
-        <Chip
-          active={stateFilter === "missed"}
-          onClick={() => setStateFilter("missed")}
+      {/* Filters — inline chips on desktop; a collapsible drawer on mobile so
+          wrapped chip rows don't push the application list down the page. */}
+      <div className="mb-3 hidden md:block">{filterControls}</div>
+      <div className="mb-3 md:hidden">
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm text-slate-300"
         >
-          Missed deadline
-        </Chip>
-        <span className="mx-1 h-4 w-px bg-slate-700" />
-        {(["all", "week", "month", "custom"] as DateRange[]).map((r) => (
-          <Chip key={r} active={range === r} onClick={() => setRange(r)}>
-            {r === "all" ? "Any date" : r === "week" ? "Past week" : r === "month" ? "Past month" : "Custom"}
-          </Chip>
-        ))}
-        {range === "custom" && (
-          <span className="flex items-center gap-1">
-            <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
-            <span className="text-slate-500">to</span>
-            <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
+          <span className="flex items-center gap-2">
+            Filters &amp; tags
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            )}
           </span>
-        )}
-        <span className="mx-1 h-4 w-px bg-slate-700" />
-        <Chip
-          active={hideMissed}
-          onClick={() => setHideMissed((v) => !v)}
-        >
-          {hideMissed ? "✓ " : ""}Hide missed
-        </Chip>
-      </div>
-
-      {allTags.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-slate-500">Tags:</span>
-          {allTags.map((t) => (
-            <Chip
-              key={t}
-              active={activeTags.includes(t)}
-              onClick={() =>
-                setActiveTags((prev) =>
-                  prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
-                )
-              }
+          <span className="text-slate-500">{showFilters ? "▲" : "▾"}</span>
+        </button>
+        <AnimatePresence initial={false}>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
             >
-              {t}
-            </Chip>
-          ))}
-        </div>
-      )}
+              <div className="pt-3">{filterControls}</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* List */}
       <div className="flex-1 space-y-2 overflow-auto pb-24">

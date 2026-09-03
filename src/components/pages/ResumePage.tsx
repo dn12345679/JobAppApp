@@ -44,6 +44,9 @@ export default function ResumePage({ userId }: { userId: string }) {
   // (find-and-replace) so its inputs that seed local state — e.g. the skills line —
   // re-derive from the updated profile. Switching résumés remounts via activeId.
   const [editorEpoch, setEditorEpoch] = useState(0);
+  // Mobile only: the editor and live preview don't fit side-by-side on a phone,
+  // so they become Edit / Preview tabs (both always visible from md up).
+  const [pane, setPane] = useState<"edit" | "preview">("edit");
 
   const timer = useRef<number | undefined>(undefined);
   const pending = useRef<ResumeProfile | null>(null);
@@ -288,8 +291,27 @@ export default function ResumePage({ userId }: { userId: string }) {
         onFindReplace={() => setFindReplace(true)}
       />
 
+      {/* Mobile Edit / Preview switch (desktop shows both panes at once). */}
+      <div className="flex gap-1 border-b border-slate-800 p-1.5 md:hidden">
+        {(["edit", "preview"] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPane(p)}
+            className={`flex-1 rounded-md py-1.5 text-sm font-medium capitalize ${
+              pane === p ? "bg-indigo-600 text-white" : "text-slate-400"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 flex-none overflow-auto border-r border-slate-800">
+        <aside
+          className={`${
+            pane === "edit" ? "flex" : "hidden"
+          } w-full flex-none flex-col overflow-auto border-r border-slate-800 md:flex md:w-80`}
+        >
           <ProfileEditor
             key={`${activeId}-${editorEpoch}`}
             profile={profile}
@@ -297,7 +319,11 @@ export default function ResumePage({ userId }: { userId: string }) {
             savedAt={savedAt}
           />
         </aside>
-        <ResumePreview profile={profile} onChange={update} />
+        <div
+          className={`${pane === "preview" ? "flex" : "hidden"} flex-1 overflow-hidden md:flex`}
+        >
+          <ResumePreview profile={profile} onChange={update} />
+        </div>
       </div>
 
       <AnimatePresence>

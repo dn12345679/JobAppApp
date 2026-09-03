@@ -166,3 +166,58 @@ export type ResumeProfileData = Pick<
   ResumeProfile,
   "contact" | "education" | "experience" | "projects" | "skills" | "settings"
 >;
+
+// ---- Cover letter (per-user single document, mirrors ResumeProfile) ---------
+
+export interface CoverLetterContact {
+  fullName: string;
+  contact: string | null; // free-form contact line: email / phone
+  location: string | null; // "City, ST"
+}
+
+/** Typographic settings for a cover letter (driven by the Edit menu). */
+export interface CoverLetterSettings {
+  fontScale: number; // clamped 0.8–1.3
+  lineSpacing: number; // px added to the base line gap
+}
+
+export interface CoverLetter {
+  id: string; // own uuid; legacy single-doc rows have id == userId
+  userId: string;
+  name: string; // user-facing label, e.g. "Backend SWE letter"
+  contact: CoverLetterContact;
+  body: string; // the letter text (seeded from a default template)
+  settings: CoverLetterSettings;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CoverLetterData = Pick<CoverLetter, "contact" | "body" | "settings">;
+
+// ---- Personal notes: references + wild-card Q&A (per-user single document) ---
+
+export interface ReferenceEntry {
+  id: string;
+  name: string;
+  contact: string | null; // email / phone
+  location: string | null;
+  jobTitle: string | null;
+  relationship: string | null; // e.g. "Former manager"
+}
+
+export interface WildCardEntry {
+  id: string;
+  question: string; // e.g. "Describe your experience doing X"
+  response: string; // the user's written answer
+}
+
+export interface PersonalNotes {
+  id: string; // == userId (one row per user)
+  userId: string;
+  references: ReferenceEntry[];
+  wildcards: WildCardEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PersonalNotesData = Pick<PersonalNotes, "references" | "wildcards">;

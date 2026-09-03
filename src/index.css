@@ -65,7 +65,8 @@ body {
 /* Résumé PDF export: print ONLY the résumé sheet, which is rendered into a
    body-level portal (a sibling of #root) so hiding the app can't hide it.
    See ResumePreview.tsx and DESIGN.md §11.7. */
-#resume-print {
+#resume-print,
+#coverletter-print {
   display: none;
 }
 @media print {
@@ -81,7 +82,8 @@ body {
   #root {
     display: none !important;
   }
-  #resume-print {
+  #resume-print,
+  #coverletter-print {
     display: block !important;
   }
 }

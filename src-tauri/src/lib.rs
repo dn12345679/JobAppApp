@@ -42,13 +42,33 @@ pub fn run() {
             sql: include_str!("../migrations/0006_resume_multi.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "add cover_letter + personal_notes tables",
+            sql: include_str!("../migrations/0007_cover_letter_notes.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "add cover_letter name (multi-cover-letter)",
+            sql: include_str!("../migrations/0008_cover_letter_multi.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_fs::init());
+
+    // Process (app relaunch after an update) is desktop-only and doesn't build
+    // for Android/iOS — see the desktop-only dependency table in Cargo.toml.
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_process::init());
+    }
+
+    builder
         .setup(|app| {
             // The updater is desktop-only.
             #[cfg(desktop)]

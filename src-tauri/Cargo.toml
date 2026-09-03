@@ -23,11 +23,12 @@ tauri-plugin-opener = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
-tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Updater is desktop-only (not available on Android/iOS).
+# Updater + process are desktop-only (not available on Android/iOS). The updater
+# self-updates the installed app; process is used to relaunch it after an update.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 

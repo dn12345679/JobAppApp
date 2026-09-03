@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Desktop-only: auto-update and relaunch-after-update. These plugins don't exist on Android/iOS, so the capability is scoped to desktop platforms to keep mobile capability validation from failing.",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["main"],
+  "permissions": ["updater:default", "process:allow-restart"]
+}

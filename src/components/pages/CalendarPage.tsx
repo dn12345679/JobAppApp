@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { JobApplication } from "../../types";
 import { listJobs } from "../../lib/db";
 import { fmtDate } from "../../lib/format";
+import { STATE_LABELS, STATE_STYLES } from "../../lib/jobRules";
 import ModalPortal from "../ModalPortal";
 
 type EventKind = "deadline" | "interview";
@@ -116,9 +117,9 @@ export default function CalendarPage({
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row md:gap-6">
         {/* Calendar grid */}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-[20rem] min-w-0 flex-1 flex-col md:min-h-0">
           <div className="grid grid-cols-7 gap-1 pb-1 text-center text-[1.1rem] text-slate-500">
             {WEEKDAYS.map((d) => (
               <div key={d}>{d}</div>
@@ -181,7 +182,7 @@ export default function CalendarPage({
         </div>
 
         {/* Deadline rail */}
-        <div className="flex w-72 shrink-0 flex-col overflow-auto pr-1">
+        <div className="flex w-full shrink-0 flex-col overflow-visible pr-1 md:w-72 md:overflow-auto">
           <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
             Upcoming
           </h3>
@@ -276,8 +277,16 @@ function DayPopup({
                 ev.kind === "interview" ? "border-amber-400" : "border-indigo-400"
               }`}
             >
-              <div className="text-sm text-slate-100">
-                {ev.job.title} · <span className="text-slate-400">{ev.job.company}</span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 text-sm text-slate-100">
+                  {ev.job.title} ·{" "}
+                  <span className="text-slate-400">{ev.job.company}</span>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${STATE_STYLES[ev.job.state]}`}
+                >
+                  {STATE_LABELS[ev.job.state]}
+                </span>
               </div>
               <div className="text-[1rem] text-slate-500">
                 {ev.kind === "interview" ? "Interview" : "Application deadline"}
@@ -293,6 +302,11 @@ function DayPopup({
                   </>
                 )}
               </div>
+              {ev.job.state === "Applied" && ev.job.dateApplied && (
+                <div className="mt-0.5 text-[1rem] text-emerald-300/80">
+                  Applied {fmtDate(ev.job.dateApplied)}
+                </div>
+              )}
             </li>
           ))}
         </ul>

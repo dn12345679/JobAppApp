@@ -183,6 +183,46 @@ create policy rp_update on public.resume_profile
 create policy rp_delete on public.resume_profile
   for delete using (user_id = auth.uid());
 
+-- Cover letters (multi-doc per user; same shape/RLS as resume_profile).
+create table if not exists public.cover_letter (
+  id         uuid primary key,        -- own uuid (legacy rows: == user_id)
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  name       text,                    -- user label; NULL → default in the client
+  data       jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted    boolean not null default false
+);
+alter table public.cover_letter enable row level security;
+create policy cl_select on public.cover_letter
+  for select using (user_id = auth.uid());
+create policy cl_insert on public.cover_letter
+  for insert with check (user_id = auth.uid());
+create policy cl_update on public.cover_letter
+  for update using (user_id = auth.uid());
+create policy cl_delete on public.cover_letter
+  for delete using (user_id = auth.uid());
+
+-- Personal notes: professional references + wild-card Q&A (per-user single doc).
+create table if not exists public.personal_notes (
+  id         uuid primary key,        -- == user_id
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  data       jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted    boolean not null default false,
+  unique (user_id)
+);
+alter table public.personal_notes enable row level security;
+create policy pn_select on public.personal_notes
+  for select using (user_id = auth.uid());
+create policy pn_insert on public.personal_notes
+  for insert with check (user_id = auth.uid());
+create policy pn_update on public.personal_notes
+  for update using (user_id = auth.uid());
+create policy pn_delete on public.personal_notes
+  for delete using (user_id = auth.uid());
+
 -- ---------------------------------------------------------------------------
 -- Sharing RPCs (memberships store only user_id; clients can't read auth.users)
 -- ---------------------------------------------------------------------------

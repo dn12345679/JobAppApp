@@ -95,6 +95,23 @@ export async function syncAll(): Promise<SyncResult> {
     [uid],
   );
 
+  // Cover letters are multi-doc like résumés: keep each row's own id and rewrite
+  // only the owner; re-key a legacy id=='local' single seed to the uid.
+  await db.execute(
+    "UPDATE OR IGNORE cover_letter SET id = $1, user_id = $1, dirty = 1 WHERE user_id = 'local' AND id = 'local'",
+    [uid],
+  );
+  await db.execute(
+    "UPDATE cover_letter SET user_id = $1, dirty = 1 WHERE user_id = 'local'",
+    [uid],
+  );
+  // Personal notes is a single per-user doc (id == user_id).
+  await db.execute(
+    "UPDATE OR IGNORE personal_notes SET id = $1, user_id = $1, dirty = 1 WHERE user_id = 'local'",
+    [uid],
+  );
+  await db.execute("DELETE FROM personal_notes WHERE user_id = 'local'");
+
   // 2. PUSH all workspaces we own (not just dirty) so every membership's FK
   //    target is guaranteed to exist on the server before step 3.
   const ownedWs = await db.select<Row[]>(
@@ -203,6 +220,53 @@ export async function syncAll(): Promise<SyncResult> {
     );
   }
 
+  // 4d. PUSH dirty cover letters (multi-doc, carries `name`).
+  const dirtyCovers = await db.select<Row[]>(
+    "SELECT * FROM cover_letter WHERE dirty = 1 AND user_id = $1",
+    [uid],
+  );
+  if (dirtyCovers.length) {
+    const { error } = await supabase.from("cover_letter").upsert(
+      dirtyCovers.map((p) => ({
+        id: p.id,
+        user_id: p.user_id,
+        name: p.name ?? null,
+        data: parseJson(p.data),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+        deleted: !!p.deleted,
+      })),
+    );
+    if (error) throw new Error(`push cover_letter: ${error.message}`);
+    await db.execute(
+      "UPDATE cover_letter SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+      [uid],
+    );
+  }
+
+  // 4e. PUSH the dirty personal notes (single per-user doc).
+  const dirtyNotes = await db.select<Row[]>(
+    "SELECT * FROM personal_notes WHERE dirty = 1 AND user_id = $1",
+    [uid],
+  );
+  if (dirtyNotes.length) {
+    const { error } = await supabase.from("personal_notes").upsert(
+      dirtyNotes.map((p) => ({
+        id: p.id,
+        user_id: p.user_id,
+        data: parseJson(p.data),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+        deleted: !!p.deleted,
+      })),
+    );
+    if (error) throw new Error(`push personal_notes: ${error.message}`);
+    await db.execute(
+      "UPDATE personal_notes SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+      [uid],
+    );
+  }
+
   // 5. PULL everything visible (RLS limits to the user's workspaces).
   const { data: wsRemote, error: wsErr } = await supabase
     .from("workspaces")
@@ -233,6 +297,18 @@ export async function syncAll(): Promise<SyncResult> {
     .select("*");
   if (rpErr) throw new Error(`pull resume profile: ${rpErr.message}`);
   for (const p of rpRemote ?? []) await upsertResumeProfileLocal(p);
+
+  const { data: clRemote, error: clErr } = await supabase
+    .from("cover_letter")
+    .select("*");
+  if (clErr) throw new Error(`pull cover_letter: ${clErr.message}`);
+  for (const d of clRemote ?? []) await upsertCoverLetterLocal(d);
+
+  const { data: pnRemote, error: pnErr } = await supabase
+    .from("personal_notes")
+    .select("*");
+  if (pnErr) throw new Error(`pull personal_notes: ${pnErr.message}`);
+  for (const d of pnRemote ?? []) await upsertSingleDocLocal("personal_notes", d);
 
   return {
     pushedJobs: dirtyJobs.length,
@@ -290,6 +366,39 @@ export async function syncAll(): Promise<SyncResult> {
       [
         p.id, p.user_id, p.name ?? null, JSON.stringify(p.data ?? {}),
         p.created_at, p.updated_at, bool01(p.deleted),
+      ],
+    );
+  }
+
+  // personal_notes is a single per-user doc with the resume_profile shape minus
+  // `name`. Table name is a fixed literal here.
+  async function upsertSingleDocLocal(table: "personal_notes", d: Row) {
+    await db.execute(
+      `INSERT INTO ${table} (id, user_id, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, 0, $6)
+       ON CONFLICT(id) DO UPDATE SET
+         user_id = excluded.user_id, data = excluded.data,
+         updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
+       WHERE excluded.updated_at >= ${table}.updated_at`,
+      [
+        d.id, d.user_id, JSON.stringify(d.data ?? {}),
+        d.created_at, d.updated_at, bool01(d.deleted),
+      ],
+    );
+  }
+
+  // cover_letter carries `name` (multi-doc), like resume_profile.
+  async function upsertCoverLetterLocal(d: Row) {
+    await db.execute(
+      `INSERT INTO cover_letter (id, user_id, name, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
+       ON CONFLICT(id) DO UPDATE SET
+         user_id = excluded.user_id, name = excluded.name, data = excluded.data,
+         updated_at = excluded.updated_at, deleted = excluded.deleted, dirty = 0
+       WHERE excluded.updated_at >= cover_letter.updated_at`,
+      [
+        d.id, d.user_id, d.name ?? null, JSON.stringify(d.data ?? {}),
+        d.created_at, d.updated_at, bool01(d.deleted),
       ],
     );
   }

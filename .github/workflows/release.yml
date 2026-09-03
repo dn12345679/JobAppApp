@@ -6,9 +6,15 @@ on:
   push:
     tags:
       - "v*"
+  # Manual run (Actions tab → Release → Run workflow): builds + signs the Android
+  # APK and uploads it as a downloadable artifact — no release is created. Use it
+  # to validate the Android signing pipeline before cutting a real tag.
+  workflow_dispatch:
 
 jobs:
   release:
+    # Desktop installers + draft release only on a real tag push.
+    if: github.event_name == 'push'
     permissions:
       contents: write
     strategy:
@@ -61,8 +67,106 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Job Tracker ${{ github.ref_name }}"
-          releaseBody: "Download the installer for your OS below. Existing installs update automatically. macOS: right-click the app → Open on first launch (unsigned)."
+          releaseBody: "Download the installer for your OS below. Existing installs update automatically. macOS: right-click the app → Open on first launch (unsigned). Android: install the .apk (auto-updates via Obtainium — see README)."
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # ---------------------------------------------------------------------------
+  # Android: build a signed universal APK and attach it to the same draft
+  # release. Distributed via Obtainium (point it at this repo's Releases) — it
+  # checks for new versions and prompts install; Android has no silent update
+  # for sideloaded apps. There is NO desktop-style updater on Android.
+  #
+  # Required repo secrets (Settings → Secrets and variables → Actions):
+  #   ANDROID_KEYSTORE_BASE64   base64 of your release keystore (.jks). Create:
+  #     keytool -genkey -v -keystore job-tracker.jks -keyalg RSA -keysize 2048 \
+  #             -validity 10000 -alias job-tracker
+  #     base64 -w0 job-tracker.jks   (PowerShell:
+  #       [Convert]::ToBase64String([IO.File]::ReadAllBytes("job-tracker.jks")))
+  #   ANDROID_KEYSTORE_PASSWORD store password used above
+  #   ANDROID_KEY_ALIAS         the alias (e.g. job-tracker)
+  #   ANDROID_KEY_PASSWORD      the key password (often same as store password)
+  #   VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY   (already set for desktop)
+  #
+  # BACK UP the keystore. Losing it means existing installs can never update
+  # (signature mismatch) — same rule as the desktop signing key.
+  # ---------------------------------------------------------------------------
+  android:
+    needs: [release]
+    # Runs after the desktop release on a tag push, or standalone on a manual run.
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.release.result == 'success') }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Initialize the Android project
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android init
+
+      - name: Build the APK
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android build --apk
+
+      - name: Sign the APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore.jks"
+          UNSIGNED=$(find src-tauri/gen/android -name '*universal-release-unsigned.apk' | head -1)
+          if [ -z "$UNSIGNED" ]; then
+            UNSIGNED=$(find src-tauri/gen/android -name '*-release-unsigned.apk' | head -1)
+          fi
+          echo "Unsigned APK: $UNSIGNED"
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign \
+            --ks "$RUNNER_TEMP/keystore.jks" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            --out "JobTracker-${{ github.ref_name }}.apk" \
+            "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --verbose "JobTracker-${{ github.ref_name }}.apk"
+
+      - name: Attach the APK to the release (tag builds)
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "JobTracker-${{ github.ref_name }}.apk" --clobber
+
+      - name: Upload the APK as an artifact (manual test builds)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: "*.apk"
+          if-no-files-found: error

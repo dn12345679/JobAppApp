@@ -17,6 +17,8 @@ import StatsPage from "./components/pages/StatsPage";
 import JobsPage from "./components/pages/JobsPage";
 import CalendarPage from "./components/pages/CalendarPage";
 import ResumePage from "./components/pages/ResumePage";
+import CoverLetterPage from "./components/pages/CoverLetterPage";
+import NotesPage from "./components/pages/NotesPage";
 import AccountMenu from "./components/AccountMenu";
 import MembersModal from "./components/MembersModal";
 import CreateWorkspaceModal from "./components/CreateWorkspaceModal";
@@ -27,7 +29,7 @@ import SignInPage from "./components/SignInPage";
 // sub-tabs. See DESIGN.md §11.
 type Mode = "applications" | "tools";
 type Tab = "stats" | "jobs" | "calendar";
-type ToolTab = "resume";
+type ToolTab = "resume" | "cover" | "notes";
 
 type NavTab = { id: string; label: string };
 
@@ -44,7 +46,49 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 const TOOL_TABS: { id: ToolTab; label: string }[] = [
   { id: "resume", label: "Résumé" },
+  { id: "cover", label: "Cover Letter" },
+  { id: "notes", label: "Notes" },
 ];
+
+// Mobile-only bottom navigation: flattens the desktop's two-level nav (mode
+// switch + sub-tabs) into one row. Each item resolves to a (mode, tab) pair.
+type BottomNavItem = { id: string; label: string; mode: Mode; tab?: Tab };
+const BOTTOM_NAV: BottomNavItem[] = [
+  { id: "stats", label: "Stats", mode: "applications", tab: "stats" },
+  { id: "jobs", label: "Jobs", mode: "applications", tab: "jobs" },
+  { id: "calendar", label: "Calendar", mode: "applications", tab: "calendar" },
+  { id: "tools", label: "Tools", mode: "tools" },
+];
+
+function BottomNavIcon({ id }: { id: string }) {
+  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.8 } as const;
+  if (id === "stats")
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" {...p}>
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      </svg>
+    );
+  if (id === "calendar")
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" {...p}>
+        <rect x="3" y="4.5" width="18" height="16" rx="2" />
+        <path d="M3 9h18M8 2.5v4M16 2.5v4" />
+      </svg>
+    );
+  if (id === "tools")
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" {...p}>
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v4h4M9 13h6M9 17h6" />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" {...p}>
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("applications");
@@ -257,13 +301,14 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       {/* Header: title + workspace switcher */}
-      <header className="flex items-center justify-between gap-4 border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold tracking-tight text-slate-100">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-3 py-2.5 md:gap-4 md:px-6 md:py-3">
+        <div className="flex items-center gap-3 md:gap-4">
+          <h1 className="text-base font-semibold tracking-tight text-slate-100 md:text-lg">
             JobAppApp
           </h1>
-          {/* Top-level mode switch: Applications to Tools */}
-          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5">
+          {/* Top-level mode switch: Applications to Tools. Hidden on mobile —
+              the bottom tab bar covers this navigation. */}
+          <div className="hidden rounded-lg border border-slate-700 bg-slate-800 p-0.5 md:inline-flex">
             {MODES.map((m) => {
               const active = mode === m.id;
               return (
@@ -282,16 +327,19 @@ export default function App() {
             })}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {/* Workspace controls are meaningful only for the workspace-scoped
-              Applications mode; the per-user Tools mode hides them. */}
+              Applications mode; the per-user Tools mode hides them. On mobile
+              only the switcher itself shows; create/settings stay desktop-only. */}
           {mode === "applications" && (
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500">Workspace</label>
+              <label className="hidden text-xs text-slate-500 md:block">
+                Workspace
+              </label>
               <select
                 value={activeWs ?? ""}
                 onChange={(e) => setActiveWs(e.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+                className="max-w-[8.5rem] truncate rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-200 outline-none focus:border-indigo-500 md:max-w-none md:px-3"
               >
                 {workspaces.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -303,7 +351,7 @@ export default function App() {
               <button
                 onClick={() => setShowCreateWs(true)}
                 title="New workspace"
-                className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100"
+                className="hidden rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100 md:block"
               >
                 ＋
               </button>
@@ -312,7 +360,7 @@ export default function App() {
                 <button
                   onClick={() => setShowMembers(true)}
                   title="Share / members"
-                  className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100"
+                  className="hidden rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-300 hover:border-slate-600 hover:text-slate-100 md:block"
                 >
                   Workspace Settings
                 </button>
@@ -324,9 +372,12 @@ export default function App() {
               onClick={syncNow}
               disabled={syncing}
               title={syncMsg ?? "Sync now"}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 hover:border-slate-600 disabled:opacity-50"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-slate-200 hover:border-slate-600 disabled:opacity-50 md:px-3"
             >
-              {syncing ? "Syncing…" : "⟳ Sync"}
+              <span className="hidden md:inline">
+                {syncing ? "Syncing…" : "⟳ Sync"}
+              </span>
+              <span className="md:hidden">{syncing ? "…" : "⟳"}</span>
             </button>
           )}
           <AccountMenu
@@ -357,8 +408,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Sub-tab bar for the active mode */}
-      <nav className="flex gap-1 border-b border-slate-800 px-4">
+      {/* Sub-tab bar. Desktop: always shown. Mobile: hidden for Applications
+          (the bottom bar covers those), but shown for Tools so its sub-tabs
+          (Résumé / Cover Letter / Notes) remain reachable. */}
+      <nav
+        className={`gap-1 border-b border-slate-800 px-4 ${
+          mode === "tools" ? "flex" : "hidden md:flex"
+        }`}
+      >
         {navTabs.map((t) => {
           const active = activeTabId === t.id;
           return (
@@ -393,7 +450,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="absolute inset-0 overflow-auto p-6"
+            className="absolute inset-0 overflow-auto p-3 md:p-6"
           >
             {mode === "applications" && activeWs && tab === "stats" && (
               <StatsPage workspaceId={activeWs} refreshKey={dataVersion} />
@@ -412,9 +469,38 @@ export default function App() {
             {mode === "tools" && toolTab === "resume" && (
               <ResumePage userId={currentUserId} />
             )}
+            {mode === "tools" && toolTab === "cover" && (
+              <CoverLetterPage userId={currentUserId} />
+            )}
+            {mode === "tools" && toolTab === "notes" && (
+              <NotesPage userId={currentUserId} />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Mobile bottom navigation — flattens mode + sub-tabs into one row. */}
+      <nav className="flex border-t border-slate-800 bg-slate-900/60 md:hidden">
+        {BOTTOM_NAV.map((item) => {
+          const active =
+            item.mode === "tools" ? mode === "tools" : mode === "applications" && tab === item.tab;
+          return (
+            <button
+              key={item.id}
+              onClick={() => {
+                setMode(item.mode);
+                if (item.mode === "applications" && item.tab) setTab(item.tab);
+              }}
+              className={`flex flex-1 flex-col items-center gap-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-[11px] transition-colors ${
+                active ? "text-indigo-300" : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <BottomNavIcon id={item.id} />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
 
       <AnimatePresence>
         {showMembers && activeWs && (

@@ -3,8 +3,12 @@ import { BaseDirectory, remove } from "@tauri-apps/plugin-fs";
 import { supabase } from "./supabase";
 import type {
   ContactInfo,
+  CoverLetter,
+  CoverLetterData,
   JobApplication,
   NewJobInput,
+  PersonalNotes,
+  PersonalNotesData,
   ResumeProfile,
   ResumeProfileData,
   ResumeSettings,
@@ -171,6 +175,8 @@ export async function clearLocalData(): Promise<void> {
   await db.execute("DELETE FROM job_applications");
   await db.execute("DELETE FROM stages");
   await db.execute("DELETE FROM resume_profile");
+  await db.execute("DELETE FROM cover_letter");
+  await db.execute("DELETE FROM personal_notes");
   await db.execute("DELETE FROM memberships");
   await db.execute("DELETE FROM workspaces");
   ensurePromise = null; // allow a fresh seed for the new account
@@ -782,6 +788,282 @@ export async function saveResumeProfile(
   await db.execute(
     "UPDATE resume_profile SET data = $2, updated_at = $3, dirty = 1 WHERE id = $1",
     [updated.id, JSON.stringify(toProfileData(updated)), updated.updatedAt],
+  );
+  return updated;
+}
+
+// ---- cover letter (per-user, one row; same shape as resume_profile) ---------
+
+/** The starter text a new cover letter is seeded with (user-editable). */
+export const DEFAULT_COVER_LETTER_BODY = `Dear [Hiring Manager's Name],
+
+Good day! [I was referred to your company by ___ / I saw your job post on ___]. [Company]’s [unique selling point or project] really stood out to me, and I’d love to be part of your team.
+
+After [X years] in [past industry or role], I’ve decided to [make a career move / follow my passion / switch focus] to [target role or industry]. I bring [relevant skills or experiences], and I’ve always enjoyed [something related to the job]. Based on your job ad, I believe I could be a strong match.
+
+To give you a better idea of my work, I’d be happy to provide a free [sample/demo/test project].
+
+Attached is my resume. I hope to hear from you soon!
+
+Sincerely,
+
+[Your Name]`;
+
+/** Generic tolerant JSON parse for a `data` column → a partial document. */
+function safeParseJson<T>(raw: unknown): Partial<T> {
+  if (typeof raw !== "string") return {};
+  try {
+    const v = JSON.parse(raw);
+    return v && typeof v === "object" ? (v as Partial<T>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Default label for a cover letter whose `name` is NULL (legacy rows). */
+export const DEFAULT_COVER_LETTER_NAME = "My cover letter";
+
+export function defaultCoverLetterSettings(): CoverLetter["settings"] {
+  return { fontScale: 1, lineSpacing: 0 };
+}
+
+function emptyCoverContact(): CoverLetter["contact"] {
+  return { fullName: "", contact: null, location: null };
+}
+
+function toCoverData(c: CoverLetter): CoverLetterData {
+  return { contact: c.contact, body: c.body, settings: c.settings };
+}
+
+function rowToCoverLetter(r: JobRow): CoverLetter {
+  const d = safeParseJson<CoverLetterData>(r.data);
+  return {
+    id: r.id as string,
+    userId: r.user_id as string,
+    name: ((r.name as string) ?? "").trim() || DEFAULT_COVER_LETTER_NAME,
+    contact: { ...emptyCoverContact(), ...(d.contact ?? {}) },
+    body: typeof d.body === "string" ? d.body : DEFAULT_COVER_LETTER_BODY,
+    settings: { ...defaultCoverLetterSettings(), ...(d.settings ?? {}) },
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+function defaultCoverLetter(
+  userId: string,
+  ts: string,
+  opts?: { id?: string; name?: string },
+): CoverLetter {
+  return {
+    id: opts?.id ?? userId, // first row keeps id == userId; extras get a uuid
+    userId,
+    name: opts?.name ?? DEFAULT_COVER_LETTER_NAME,
+    contact: emptyCoverContact(),
+    body: DEFAULT_COVER_LETTER_BODY,
+    settings: defaultCoverLetterSettings(),
+    createdAt: ts,
+    updatedAt: ts,
+  };
+}
+
+/** All of a user's live (non-trashed) cover letters, oldest first. */
+export async function listCoverLetters(
+  userId: string = LOCAL_USER_ID,
+): Promise<CoverLetter[]> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM cover_letter WHERE user_id = $1 AND deleted = 0 ORDER BY created_at ASC",
+    [userId],
+  );
+  return rows.map(rowToCoverLetter);
+}
+
+/** Soft-deleted cover letters for the Trash view. */
+export async function listTrashedCoverLetters(
+  userId: string = LOCAL_USER_ID,
+): Promise<CoverLetter[]> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM cover_letter WHERE user_id = $1 AND deleted = 1 ORDER BY updated_at DESC",
+    [userId],
+  );
+  return rows.map(rowToCoverLetter);
+}
+
+/** A single cover letter by id, or null if missing/trashed. */
+export async function getCoverLetterById(id: string): Promise<CoverLetter | null> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM cover_letter WHERE id = $1 AND deleted = 0 LIMIT 1",
+    [id],
+  );
+  return rows.length ? rowToCoverLetter(rows[0]) : null;
+}
+
+/** Returns the user's cover letters, seeding a first template-filled one if none. */
+export async function ensureAtLeastOneCoverLetter(
+  userId: string = LOCAL_USER_ID,
+): Promise<CoverLetter[]> {
+  const existing = await listCoverLetters(userId);
+  if (existing.length > 0) return existing;
+  await createCoverLetter(userId, { seedId: userId });
+  return listCoverLetters(userId);
+}
+
+function insertCoverLetter(cl: CoverLetter): Promise<unknown> {
+  return getDb().then((db) =>
+    db.execute(
+      `INSERT OR IGNORE INTO cover_letter (id, user_id, name, data, created_at, updated_at, dirty, deleted)
+       VALUES ($1, $2, $3, $4, $5, $5, 1, 0)`,
+      [cl.id, cl.userId, cl.name, JSON.stringify(toCoverData(cl)), cl.createdAt],
+    ),
+  );
+}
+
+/** Creates a new cover letter (template-filled by default). */
+export async function createCoverLetter(
+  userId: string = LOCAL_USER_ID,
+  opts?: { name?: string; seedId?: string },
+): Promise<CoverLetter> {
+  const ts = now();
+  const cl = defaultCoverLetter(userId, ts, {
+    id: opts?.seedId ?? uuid(),
+    name: opts?.name,
+  });
+  await insertCoverLetter(cl);
+  return cl;
+}
+
+/** Duplicates a cover letter into a new row (own uuid + name). */
+export async function copyCoverLetter(
+  sourceId: string,
+  opts?: { name?: string },
+): Promise<CoverLetter> {
+  const source = await getCoverLetterById(sourceId);
+  if (!source) throw new Error("copyCoverLetter: source not found");
+  const ts = now();
+  const copy: CoverLetter = {
+    ...structuredClone(source),
+    id: uuid(),
+    name: opts?.name ?? `${source.name} (copy)`,
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  await insertCoverLetter(copy);
+  return copy;
+}
+
+/** Inserts a sanitised imported cover letter (id/name/timestamps preset). */
+export async function importCoverLetter(cl: CoverLetter): Promise<CoverLetter> {
+  await insertCoverLetter(cl);
+  return cl;
+}
+
+export async function renameCoverLetter(id: string, name: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE cover_letter SET name = $2, updated_at = $3, dirty = 1 WHERE id = $1",
+    [id, name.trim() || DEFAULT_COVER_LETTER_NAME, now()],
+  );
+}
+
+export async function softDeleteCoverLetter(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE cover_letter SET deleted = 1, dirty = 1, updated_at = $2 WHERE id = $1",
+    [id, now()],
+  );
+}
+
+export async function restoreCoverLetter(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE cover_letter SET deleted = 0, dirty = 1, updated_at = $2 WHERE id = $1",
+    [id, now()],
+  );
+}
+
+/** Permanently removes a cover letter — Supabase first, then locally. */
+export async function permanentlyDeleteCoverLetter(id: string): Promise<void> {
+  if (supabase) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      const { error } = await supabase.from("cover_letter").delete().eq("id", id);
+      if (error) throw new Error(`permanent delete failed: ${error.message}`);
+    }
+  }
+  const db = await getDb();
+  await db.execute("DELETE FROM cover_letter WHERE id = $1", [id]);
+}
+
+/** Persists the cover letter document and marks it dirty for the next sync. */
+export async function saveCoverLetter(cl: CoverLetter): Promise<CoverLetter> {
+  const db = await getDb();
+  const updated = { ...cl, updatedAt: now() };
+  await db.execute(
+    "UPDATE cover_letter SET data = $2, updated_at = $3, dirty = 1 WHERE id = $1",
+    [updated.id, JSON.stringify(toCoverData(updated)), updated.updatedAt],
+  );
+  return updated;
+}
+
+// ---- personal notes: references + wild-card Q&A (per-user, one row) ---------
+
+function toNotesData(n: PersonalNotes): PersonalNotesData {
+  return { references: n.references, wildcards: n.wildcards };
+}
+
+function rowToNotes(r: JobRow): PersonalNotes {
+  const d = safeParseJson<PersonalNotesData>(r.data);
+  return {
+    id: r.id as string,
+    userId: r.user_id as string,
+    references: Array.isArray(d.references) ? d.references : [],
+    wildcards: Array.isArray(d.wildcards) ? d.wildcards : [],
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
+/** The user's notes (references + wild cards), seeding an empty one on first run. */
+export async function getPersonalNotes(
+  userId: string = LOCAL_USER_ID,
+): Promise<PersonalNotes> {
+  const db = await getDb();
+  const rows = await db.select<JobRow[]>(
+    "SELECT * FROM personal_notes WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+  );
+  if (rows.length > 0) return rowToNotes(rows[0]);
+
+  const ts = now();
+  const n: PersonalNotes = {
+    id: userId,
+    userId,
+    references: [],
+    wildcards: [],
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  await db.execute(
+    `INSERT OR IGNORE INTO personal_notes (id, user_id, data, created_at, updated_at, dirty, deleted)
+     VALUES ($1, $2, $3, $4, $4, 1, 0)`,
+    [n.id, n.userId, JSON.stringify(toNotesData(n)), ts],
+  );
+  const seeded = await db.select<JobRow[]>(
+    "SELECT * FROM personal_notes WHERE deleted = 0 ORDER BY created_at LIMIT 1",
+  );
+  return seeded.length ? rowToNotes(seeded[0]) : n;
+}
+
+/** Persists the notes document and marks it dirty for the next sync. */
+export async function savePersonalNotes(
+  n: PersonalNotes,
+): Promise<PersonalNotes> {
+  const db = await getDb();
+  const updated = { ...n, updatedAt: now() };
+  await db.execute(
+    "UPDATE personal_notes SET data = $2, updated_at = $3, dirty = 1 WHERE id = $1",
+    [updated.id, JSON.stringify(toNotesData(updated)), updated.updatedAt],
   );
   return updated;
 }
