@@ -124,7 +124,7 @@ jobs:
           export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
           npx tauri android init
 
-      - name: Apply native overrides (edge-to-edge + no WebView zoom)
+      - name: Apply native overrides (edge-to-edge + no WebView zoom + app icons)
         run: |
           set -euo pipefail
           MA=$(find src-tauri/gen/android -name MainActivity.kt | head -1)
@@ -132,6 +132,12 @@ jobs:
           echo "Overriding $MA"
           cp src-tauri/android-overrides/MainActivity.kt "$MA"
           cat "$MA"
+          echo "Copying custom Android app icons into gen/android"
+          cp -r src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+          MANIFEST=$(find src-tauri/gen/android -name AndroidManifest.xml | head -1)
+          if [ -n "$MANIFEST" ]; then
+            sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round"/' "$MANIFEST"
+          fi
 
       - name: Build the APK
         env:

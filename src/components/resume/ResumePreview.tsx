@@ -110,7 +110,10 @@ export default function ResumePreview({
   }, [profile]);
 
   const pages = sheetH / PAGE_H;
-  const fits = pages <= 1.001;
+  // Headroom so cross-platform font-metric differences don't flip a one-page
+  // sheet into a warning — Georgia (desktop) vs Android's serif fallback measure
+  // slightly differently. Anything clearly over one page still warns.
+  const fits = pages <= 1.08;
 
   const setTemplate = (template: ResumeTemplate) =>
     onChange({ ...profile, settings: { ...profile.settings, template } });

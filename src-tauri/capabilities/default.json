@@ -23,6 +23,15 @@
     {
       "identifier": "fs:allow-remove",
       "allow": [{ "path": "$APPCONFIG/jobtracker.db*" }]
+    },
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://*/**" },
+        { "url": "http://*/**" },
+        { "url": "https://*" },
+        { "url": "http://*" }
+      ]
     }
   ]
 }

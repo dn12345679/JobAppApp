@@ -79,7 +79,9 @@ export default function CoverLetterPreview({ letter }: { letter: CoverLetter }) 
   }, [letter]);
 
   const pages = sheetH / PAGE_H;
-  const fits = pages <= 1.001;
+  // Headroom for cross-platform font-metric differences (Georgia on desktop vs
+  // Android's serif fallback), so a one-page letter doesn't warn on mobile only.
+  const fits = pages <= 1.08;
 
   return (
     <section className="flex flex-1 flex-col overflow-hidden bg-slate-900/40">

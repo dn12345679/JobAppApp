@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { motion } from "framer-motion";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
   ApplicationState,
   AuthKind,
@@ -24,6 +25,7 @@ type PayMode = "range" | "median";
 export default function JobFormModal({
   workspaceId,
   job,
+  prefill,
   stages,
   tagSuggestions = [],
   onClose,
@@ -31,6 +33,7 @@ export default function JobFormModal({
 }: {
   workspaceId: string;
   job?: JobApplication;
+  prefill?: Partial<JobApplication>;
   stages: WorkspaceStage[];
   tagSuggestions?: string[];
   onClose: () => void;
@@ -38,40 +41,53 @@ export default function JobFormModal({
 }) {
   const editing = !!job;
 
-  const [company, setCompany] = useState(job?.company ?? "");
-  const [title, setTitle] = useState(job?.title ?? "");
+  const [company, setCompany] = useState(prefill?.company ?? job?.company ?? "");
+  const [title, setTitle] = useState(prefill?.title ?? job?.title ?? "");
   const [payMode, setPayMode] = useState<PayMode>(
-    job?.payMedian != null ? "median" : "range",
+    (prefill?.payMedian ?? job?.payMedian) != null ? "median" : "range",
   );
-  const [payMin, setPayMin] = useState(numStr(job?.payMin));
-  const [payMax, setPayMax] = useState(numStr(job?.payMax));
-  const [payMedian, setPayMedian] = useState(numStr(job?.payMedian));
-  const [hourly, setHourly] = useState(job?.hourly ?? false);
+  const [payMin, setPayMin] = useState(numStr(prefill?.payMin ?? job?.payMin));
+  const [payMax, setPayMax] = useState(numStr(prefill?.payMax ?? job?.payMax));
+  const [payMedian, setPayMedian] = useState(numStr(prefill?.payMedian ?? job?.payMedian));
+  const [hourly, setHourly] = useState(prefill?.hourly ?? job?.hourly ?? false);
   const [state, setState] = useState<ApplicationState>(
-    job?.state ?? "NotApplied",
+    prefill?.state ?? job?.state ?? "NotApplied",
   );
-  const [stage, setStage] = useState<string>(job?.stage ?? "");
+  const [stage, setStage] = useState<string>(prefill?.stage ?? job?.stage ?? "");
   const [interviewNumber, setInterviewNumber] = useState(
-    numStr(job?.interviewNumber),
+    numStr(prefill?.interviewNumber ?? job?.interviewNumber),
   );
-  const [remote, setRemote] = useState(job?.remote ?? false);
-  const [locationCity, setLocationCity] = useState(job?.locationCity ?? "");
-  const [locationState, setLocationState] = useState(job?.locationState ?? "");
-  const [auth, setAuth] = useState<AuthKind>(job?.auth ?? "none");
-  const [username, setUsername] = useState(job?.username ?? "");
-  const [notes, setNotes] = useState(job?.notes ?? "");
-  const [deadline, setDeadline] = useState(job?.deadline ?? "");
-  const [dateApplied, setDateApplied] = useState(job?.dateApplied ?? "");
+  const [remote, setRemote] = useState(prefill?.remote ?? job?.remote ?? false);
+  const [locationCity, setLocationCity] = useState(prefill?.locationCity ?? job?.locationCity ?? "");
+  const [locationState, setLocationState] = useState(prefill?.locationState ?? job?.locationState ?? "");
+  const [auth, setAuth] = useState<AuthKind>(prefill?.auth ?? job?.auth ?? "none");
+  const [username, setUsername] = useState(prefill?.username ?? job?.username ?? "");
+  const [notes, setNotes] = useState(prefill?.notes ?? job?.notes ?? "");
+  const [deadline, setDeadline] = useState(prefill?.deadline ?? job?.deadline ?? "");
+  const [dateApplied, setDateApplied] = useState(prefill?.dateApplied ?? job?.dateApplied ?? "");
   const [nextInterviewDate, setNextInterviewDate] = useState(
-    job?.nextInterviewDate ?? "",
+    prefill?.nextInterviewDate ?? job?.nextInterviewDate ?? "",
   );
-  const [endDate, setEndDate] = useState(job?.endDate ?? "");
-  const [flag, setFlag] = useState<Flag | "">(job?.flag ?? "");
-  const [link, setLink] = useState(job?.link ?? "");
-  const [tags, setTags] = useState<string[]>(job?.tags ?? []);
+  const [endDate, setEndDate] = useState(prefill?.endDate ?? job?.endDate ?? "");
+  const [flag, setFlag] = useState<Flag | "">(prefill?.flag ?? job?.flag ?? "");
+  const [link, setLink] = useState(prefill?.link ?? job?.link ?? "");
+  const [tags, setTags] = useState<string[]>(prefill?.tags ?? job?.tags ?? []);
   const [saving, setSaving] = useState(false);
 
   const canSave = company.trim() && title.trim();
+
+  const [highlightDate, setHighlightDate] = useState(false); // animation trigger for autofilling field
+
+  useEffect(() => {
+    if (state === "Applied" && stage !== "" && !dateApplied) {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      setDateApplied(today);
+      setHighlightDate(true);
+      const t = setTimeout(() => setHighlightDate(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [state, stage]);
 
   async function submit() {
     if (!canSave || saving) return;
@@ -270,7 +286,17 @@ export default function JobFormModal({
               <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />
             </Field>
             <Field label="Date applied">
-              <input type="date" value={dateApplied} onChange={(e) => setDateApplied(e.target.value)} className={inputCls} />
+              <motion.div
+                animate={
+                  highlightDate
+                    ? { boxShadow: "0 0 0 2px #6366f1, 0 0 14px 2px rgba(99, 102, 241, 0.5)" }
+                    : { boxShadow: "0 0 0 0px transparent" }
+                }
+                transition={{ duration: 0.3 }}
+                className="rounded-lg"
+              >
+                <input type="date" value={dateApplied} onChange={(e) => setDateApplied(e.target.value)} className={inputCls} />
+              </motion.div>
             </Field>
             <Field label="Next interview">
               <input type="date" value={nextInterviewDate} onChange={(e) => setNextInterviewDate(e.target.value)} className={inputCls} />
@@ -281,7 +307,40 @@ export default function JobFormModal({
           </div>
 
           <Field label="Link">
-            <input type="url" placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} className={inputCls} />
+            <div className="flex items-center gap-2">
+              <input
+                type="url"
+                placeholder="https://…"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (link.trim()) {
+                    openUrl(link.trim());
+                  }
+                }}
+                disabled={!link.trim()}
+                title={link.trim() ? "Open link in browser" : "Enter a link to open"}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/60 text-slate-300 transition hover:border-slate-600 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </button>
+            </div>
           </Field>
 
           {/* Not a <Field>: its wrapping <label> would bind to the first tag's

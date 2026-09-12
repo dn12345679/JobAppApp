@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
   ApplicationState,
   JobApplication,
   WorkspaceStage,
 } from "../../types";
-import { deleteJob, ensureStages, listJobs, listStages } from "../../lib/db";
+import {
+  deleteJob,
+  ensureStages,
+  listJobs,
+  listStages,
+  restoreJob,
+} from "../../lib/db";
 import { fmtDate, fmtPay } from "../../lib/format";
 import {
   FLAG_DOT,
@@ -15,9 +21,11 @@ import {
   isMissedDeadline,
 } from "../../lib/jobRules";
 import JobFormModal from "../JobFormModal";
+import FillByLinkModal from "../FillByLinkModal";
 import TrashModal from "../TrashModal";
 import StagesModal from "../StagesModal";
 import { exportJobs, type ExportFormat } from "../../lib/export";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 type DateRange = "all" | "week" | "month" | "custom";
 type SortKey = "newest" | "deadline" | "company" | "updated";
@@ -44,17 +52,118 @@ export default function JobsPage({
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [hideMissed, setHideMissed] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
-  const [modal, setModal] = useState<null | { job?: JobApplication }>(null);
+  const [modal, setModal] = useState<null | {
+    job?: JobApplication;
+    prefill?: Partial<JobApplication>;
+  }>(null);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const [showFillByLink, setShowFillByLink] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showStages, setShowStages] = useState(false);
   const [stages, setStages] = useState<WorkspaceStage[]>([]);
   const [showFilters, setShowFilters] = useState(false); // mobile filter drawer
 
+  const pendingDeleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [pendingDeletes, setPendingDeletes] = useState<Record<string, boolean>>({});
+  const lastScrollTopRef = useRef(0);
+
+  const dismissPendingDelete = (id: string) => {
+    if (pendingDeleteTimers.current[id]) {
+      clearTimeout(pendingDeleteTimers.current[id]);
+      delete pendingDeleteTimers.current[id];
+    }
+    setPendingDeletes((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+  };
+
+  const dismissAllPendingDeletes = () => {
+    const ids = Object.keys(pendingDeleteTimers.current);
+    if (ids.length === 0) return;
+
+    ids.forEach((id) => {
+      clearTimeout(pendingDeleteTimers.current[id]);
+      delete pendingDeleteTimers.current[id];
+    });
+
+    const idSet = new Set(ids);
+    setPendingDeletes({});
+    setJobs((prev) => prev.filter((j) => !idSet.has(j.id)));
+  };
+
+  const handleDelete = async (job: JobApplication) => {
+    try {
+      await deleteJob(job.id);
+    } catch (err) {
+      console.error("Failed to soft-delete job:", err);
+      return;
+    }
+
+    setPendingDeletes((prev) => ({ ...prev, [job.id]: true }));
+
+    if (pendingDeleteTimers.current[job.id]) {
+      clearTimeout(pendingDeleteTimers.current[job.id]);
+    }
+
+    pendingDeleteTimers.current[job.id] = setTimeout(() => {
+      dismissPendingDelete(job.id);
+    }, 5000);
+  };
+
+  const handleUndo = async (id: string) => {
+    if (pendingDeleteTimers.current[id]) {
+      clearTimeout(pendingDeleteTimers.current[id]);
+      delete pendingDeleteTimers.current[id];
+    }
+    setPendingDeletes((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    try {
+      await restoreJob(id);
+    } catch (err) {
+      console.error("Failed to restore job:", err);
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const currentScrollTop = e.currentTarget.scrollTop;
+    if (Math.abs(currentScrollTop - lastScrollTopRef.current) > 2) {
+      lastScrollTopRef.current = currentScrollTop;
+      if (Object.keys(pendingDeleteTimers.current).length > 0) {
+        dismissAllPendingDeletes();
+      }
+    }
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaY) > 5 || Math.abs(e.deltaX) > 5) {
+      if (Object.keys(pendingDeleteTimers.current).length > 0) {
+        dismissAllPendingDeletes();
+      }
+    }
+  };
+
   async function refresh() {
+    Object.values(pendingDeleteTimers.current).forEach((timer) => clearTimeout(timer));
+    pendingDeleteTimers.current = {};
+    setPendingDeletes({});
     setJobs(await listJobs(workspaceId));
     setStages(await listStages(workspaceId));
   }
+
+  useEffect(() => {
+    return () => {
+      Object.values(pendingDeleteTimers.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -305,7 +414,11 @@ export default function JobsPage({
       </div>
 
       {/* List */}
-      <div className="flex-1 space-y-2 overflow-auto pb-24">
+      <div
+        onScroll={handleScroll}
+        onWheel={handleWheel}
+        className="flex-1 space-y-2 overflow-auto pb-24"
+      >
         {filtered.length === 0 ? (
           <div className="mt-16 text-center text-slate-500">
             <p className="mt-3">
@@ -315,37 +428,123 @@ export default function JobsPage({
             </p>
           </div>
         ) : (
-          filtered.map((job) => (
-            <JobRow
-              key={job.id}
-              job={job}
-              canWrite={canWrite}
-              onEdit={() => setModal({ job })}
-              onDelete={async () => {
-                await deleteJob(job.id);
-                refresh();
-              }}
-            />
-          ))
+          <AnimatePresence initial={false}>
+            {filtered.map((job) => (
+              <motion.div
+                key={job.id}
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{
+                  opacity: 0,
+                  height: 0,
+                  scale: 0.95,
+                  transition: { duration: 0.25, ease: "easeInOut" },
+                }}
+                className="overflow-hidden rounded-xl"
+              >
+                <JobRow
+                  job={job}
+                  canWrite={canWrite}
+                  isDeleted={!!pendingDeletes[job.id]}
+                  onEdit={() => setModal({ job })}
+                  onDelete={() => handleDelete(job)}
+                  onUndo={() => handleUndo(job.id)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
       {canWrite && (
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => setModal({})}
-          className="absolute bottom-6 right-6 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg  hover:bg-indigo-500"
-        >
-          + New application
-        </motion.button>
+        <div className="absolute bottom-6 right-6 z-30">
+          <AnimatePresence mode="wait">
+            {!fabExpanded ? (
+              <motion.button
+                key="fab-default"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.12 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setFabExpanded(true)}
+                className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500 transition"
+              >
+                <span>+ New application</span>
+              </motion.button>
+            ) : (
+              <motion.div
+                key="fab-expanded"
+                initial={{ opacity: 0, scale: 0.85, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 6 }}
+                transition={{ type: "spring", stiffness: 600, damping: 30 }}
+                className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/95 p-1.5 shadow-2xl backdrop-blur-md"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => {
+                    setFabExpanded(false);
+                    setShowFillByLink(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition"
+                >
+                  <span>AI</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => {
+                    setFabExpanded(false);
+                    setModal({});
+                  }}
+                  className="flex items-center gap-1.5 rounded-full bg-slate-700/80 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition"
+                >
+                  <span>Manual</span>
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => setFabExpanded(false)}
+                  title="Close"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition text-xs"
+                >
+                  ✕
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Backdrop overlay to close expanded FAB on click outside */}
+      {fabExpanded && (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setFabExpanded(false)}
+        />
       )}
 
       <AnimatePresence>
+        {showFillByLink && (
+          <FillByLinkModal
+            existingTags={allTags}
+            onSuccess={(prefill) => {
+              setShowFillByLink(false);
+              setModal({ prefill });
+            }}
+            onCancel={() => setShowFillByLink(false)}
+          />
+        )}
         {modal && (
           <JobFormModal
             workspaceId={workspaceId}
             job={modal.job}
+            prefill={modal.prefill}
             stages={stages}
             tagSuggestions={allTags}
             onClose={() => setModal(null)}
@@ -377,13 +576,17 @@ export default function JobsPage({
 function JobRow({
   job,
   canWrite,
+  isDeleted,
   onEdit,
   onDelete,
+  onUndo,
 }: {
   job: JobApplication;
   canWrite: boolean;
+  isDeleted?: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onUndo?: () => void;
 }) {
   const location = job.remote
     ? "Remote"
@@ -398,68 +601,138 @@ function JobRow({
   const missed = isMissedDeadline(job);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      onClick={canWrite ? onEdit : undefined}
-      className={`group flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-800/40 px-4 py-3 ${
-        canWrite ? "cursor-pointer hover:border-slate-600" : "cursor-default"
-      }`}
-    >
-      {job.flag && (
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${FLAG_DOT[job.flag]}`} title={`Flag: ${job.flag}`} />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="truncate font-medium text-slate-100">{job.title}</span>
-          <span className="truncate text-sm text-slate-400">· {job.company}</span>
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Background showing 'Deleted' + Undo button */}
+      <div
+        className={`absolute inset-0 flex items-center justify-between rounded-xl border border-dashed border-slate-700/60 bg-slate-900/90 px-4 py-3 transition-opacity duration-200 ${
+          isDeleted ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs text-rose-400 font-semibold">
+            ✕
+          </span>
+          <span className="text-sm font-medium text-slate-300">Deleted</span>
+          <span className="hidden text-xs text-slate-500 sm:inline truncate max-w-xs">
+            · {job.title} {job.company ? `(${job.company})` : ""}
+          </span>
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-          <span>{location}</span>
-          {pay && <span>{pay}</span>}
-          {job.deadline && (
-            <span className={missed ? "text-rose-400" : undefined}>
-              Due {fmtDate(job.deadline)}
-            </span>
-          )}
-          {job.endDate && <span>Ended {fmtDate(job.endDate)}</span>}
-          {job.tags.map((t) => (
-            <span key={t} className="rounded-full bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300">
-              {t}
-            </span>
-          ))}
-        </div>
+        {onUndo && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUndo();
+            }}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-indigo-400 hover:bg-slate-700 hover:text-indigo-300 transition shadow-sm active:scale-95"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2m0 0l-4-4m4 4l4-4" />
+            </svg>
+            <span>Undo</span>
+          </button>
+        )}
       </div>
-      {stageLabel && (
-        <span className="shrink-0 rounded-full bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-300">
-          {stageLabel}
+
+      {/* Front card that slides out */}
+      <motion.div
+        animate={{
+          x: isDeleted ? "105%" : "0%",
+          opacity: isDeleted ? 0 : 1,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 350,
+          damping: 30,
+        }}
+        onClick={canWrite && !isDeleted ? onEdit : undefined}
+        className={`group relative z-10 flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-800/95 px-4 py-3 backdrop-blur-sm ${
+          canWrite && !isDeleted ? "cursor-pointer hover:border-slate-600" : "cursor-default"
+        }`}
+        style={{
+          pointerEvents: isDeleted ? "none" : "auto",
+        }}
+      >
+        {job.flag && (
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${FLAG_DOT[job.flag]}`} title={`Flag: ${job.flag}`} />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="truncate font-medium text-slate-100">{job.title}</span>
+            <span className="truncate text-sm text-slate-400">· {job.company}</span>
+            {job.link && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (job.link) openUrl(job.link);
+                }}
+                title="Open job posting in browser"
+                className="inline-flex items-center text-slate-400 opacity-0 transition hover:text-indigo-400 group-hover:opacity-100"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+            <span>{location}</span>
+            {pay && <span>{pay}</span>}
+            {job.deadline && (
+              <span className={missed ? "text-rose-400" : undefined}>
+                Due {fmtDate(job.deadline)}
+              </span>
+            )}
+            {job.endDate && <span>Ended {fmtDate(job.endDate)}</span>}
+            {job.tags.map((t) => (
+              <span key={t} className="rounded-full bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300">
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+        {stageLabel && (
+          <span className="shrink-0 rounded-full bg-indigo-500/15 px-2.5 py-1 text-xs font-medium text-indigo-300">
+            {stageLabel}
+          </span>
+        )}
+        {missed && (
+          <span
+            className="shrink-0 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300"
+            title="Deadline passed without applying"
+          >
+            Missed deadline
+          </span>
+        )}
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATE_STYLES[job.state]}`}>
+          {STATE_LABELS[job.state]}
         </span>
-      )}
-      {missed && (
-        <span
-          className="shrink-0 rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300"
-          title="Deadline passed without applying"
-        >
-          Missed deadline
-        </span>
-      )}
-      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATE_STYLES[job.state]}`}>
-        {STATE_LABELS[job.state]}
-      </span>
-      {canWrite && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="shrink-0 rounded-lg px-2 py-1 text-slate-600 opacity-0 transition hover:bg-slate-700 hover:text-rose-400 group-hover:opacity-100"
-          title="Delete"
-        >
-          ✕
-        </button>
-      )}
-    </motion.div>
+        {canWrite && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="shrink-0 rounded-lg px-2 py-1 text-slate-600 opacity-0 transition hover:bg-slate-700 hover:text-rose-400 group-hover:opacity-100"
+            title="Delete"
+          >
+            ✕
+          </button>
+        )}
+      </motion.div>
+    </div>
   );
 }
 
@@ -475,11 +748,10 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-2.5 py-1 font-medium transition ${
-        active
+      className={`rounded-full border px-2.5 py-1 font-medium transition ${active
           ? "border-indigo-500 bg-indigo-500/15 text-indigo-200"
           : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"
-      }`}
+        }`}
     >
       {children}
     </button>

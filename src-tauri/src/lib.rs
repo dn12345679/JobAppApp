@@ -59,7 +59,8 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init());
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_http::init());
 
     // Process (app relaunch after an update) is desktop-only and doesn't build
     // for Android/iOS — see the desktop-only dependency table in Cargo.toml.

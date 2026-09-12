@@ -23,6 +23,7 @@ export default function ResumeMenuBar({
   onExportPdf,
   onSettings,
   onFindReplace,
+  onAiKeywordMatch,
 }: {
   profile: ResumeProfile;
   savedAt: "idle" | "saving" | "saved";
@@ -34,6 +35,7 @@ export default function ResumeMenuBar({
   onExportPdf: () => void;
   onSettings: (patch: Partial<ResumeSettings>) => void;
   onFindReplace: () => void;
+  onAiKeywordMatch?: () => void;
 }) {
   const [menu, setMenu] = useState<Menu>(null);
   const close = () => setMenu(null);
@@ -59,6 +61,14 @@ export default function ResumeMenuBar({
         <MenuItem onClick={run(onExportFile)}>Export résumé (.jtre)…</MenuItem>
         <MenuItem onClick={run(onExportPdf)}>Export to PDF…</MenuItem>
         <Divider />
+        {onAiKeywordMatch && (
+          <MenuItem onClick={run(onAiKeywordMatch)}>
+            <span className="flex items-center justify-between w-full">
+              <span>AI Keyword Match…</span>
+              <span className="text-[10px] text-indigo-400 font-semibold">AI</span>
+            </span>
+          </MenuItem>
+        )}
         <MenuItem onClick={run(onOpenManager)}>Trash…</MenuItem>
       </MenuButton>
 
@@ -133,17 +143,15 @@ function MenuButton({
     <div className="relative">
       <button
         onClick={onToggle}
-        className={`rounded px-2.5 py-1 text-slate-200 hover:bg-slate-700/60 ${
-          open ? "bg-slate-700/60" : ""
-        }`}
+        className={`rounded px-2.5 py-1 text-slate-200 hover:bg-slate-700/60 ${open ? "bg-slate-700/60" : ""
+          }`}
       >
         {label}
       </button>
       {open && (
         <div
-          className={`absolute left-0 top-full z-30 mt-1 ${
-            wide ? "w-72" : "w-56"
-          } rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl`}
+          className={`absolute left-0 top-full z-30 mt-1 ${wide ? "w-72" : "w-56"
+            } rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl`}
         >
           {children}
         </div>

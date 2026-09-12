@@ -19,6 +19,7 @@ import {
   exportCoverLetterToFile,
   importCoverLetterFromFile,
 } from "../../lib/coverLetterIO";
+import { exportToPdf } from "../../lib/exportPdf";
 import CoverLetterPreview from "../coverletter/CoverLetterPreview";
 import CoverLetterMenuBar from "../coverletter/CoverLetterMenuBar";
 import CoverLetterManagerModal from "../coverletter/CoverLetterManagerModal";
@@ -266,7 +267,7 @@ export default function CoverLetterPage({ userId }: { userId: string }) {
         onOpenManager={() => setManager(true)}
         onImport={handleImport}
         onExportFile={handleExportFile}
-        onExportPdf={() => window.print()}
+        onExportPdf={exportToPdf}
         onSettings={applySettings}
         onFindReplace={() => setFindReplace(true)}
       />

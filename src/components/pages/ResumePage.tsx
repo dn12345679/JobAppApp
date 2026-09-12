@@ -16,6 +16,7 @@ import {
   softDeleteResume,
 } from "../../lib/db";
 import { exportResumeToFile, importResumeFromFile } from "../../lib/resumeIO";
+import { exportToPdf } from "../../lib/exportPdf";
 import ProfileEditor from "../resume/ProfileEditor";
 import ResumePreview from "../resume/ResumePreview";
 import ResumeMenuBar from "../resume/ResumeMenuBar";
@@ -23,13 +24,20 @@ import ResumeManagerModal from "../resume/ResumeManagerModal";
 import FindReplaceModal from "../resume/FindReplaceModal";
 import ImportPreviewModal from "../resume/ImportPreviewModal";
 import TemplateGallery from "../resume/TemplateGallery";
+import AiKeywordMatchModal from "../resume/AiKeywordMatchModal";
 
 // The Tools › Résumé screen. A user can keep several named résumés; this page
 // owns the active-document state plus the Word-style menu bar (File/Edit), the
 // résumé manager (open/new/duplicate/trash) and find-and-replace. The active
 // document is the ProfileEditor's source of truth; edits save to SQLite
 // (debounced) and mark the row dirty for the next sync (DESIGN.md §11).
-export default function ResumePage({ userId }: { userId: string }) {
+export default function ResumePage({
+  userId,
+  activeWorkspaceId,
+}: {
+  userId: string;
+  activeWorkspaceId?: string;
+}) {
   const [resumes, setResumes] = useState<ResumeProfile[]>([]);
   const [trashed, setTrashed] = useState<ResumeProfile[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,6 +45,7 @@ export default function ResumePage({ userId }: { userId: string }) {
   const [savedAt, setSavedAt] = useState<"idle" | "saving" | "saved">("idle");
   const [manager, setManager] = useState(false);
   const [findReplace, setFindReplace] = useState(false);
+  const [keywordMatch, setKeywordMatch] = useState(false);
   const [copyPicker, setCopyPicker] = useState(false);
   const [importCandidate, setImportCandidate] = useState<ResumeProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -286,9 +295,10 @@ export default function ResumePage({ userId }: { userId: string }) {
         onOpenManager={() => setManager(true)}
         onImport={handleImport}
         onExportFile={handleExportFile}
-        onExportPdf={() => window.print()}
+        onExportPdf={exportToPdf}
         onSettings={applySettings}
         onFindReplace={() => setFindReplace(true)}
+        onAiKeywordMatch={() => setKeywordMatch(true)}
       />
 
       {/* Mobile Edit / Preview switch (desktop shows both panes at once). */}
@@ -367,6 +377,17 @@ export default function ResumePage({ userId }: { userId: string }) {
             profile={importCandidate}
             onConfirm={() => void confirmImport()}
             onCancel={() => setImportCandidate(null)}
+          />
+        )}
+        {keywordMatch && profile && (
+          <AiKeywordMatchModal
+            profile={profile}
+            workspaceId={activeWorkspaceId}
+            onApply={(next) => {
+              update(next);
+              setEditorEpoch((e) => e + 1);
+            }}
+            onClose={() => setKeywordMatch(false)}
           />
         )}
       </AnimatePresence>
