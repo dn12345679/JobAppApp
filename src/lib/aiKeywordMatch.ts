@@ -298,7 +298,7 @@ Note: For experience and projects, keep unchanged bullets identical so that only
 - Location: ${job.locationCity || ""}, ${job.locationState || ""} ${job.remote ? "(Remote)" : ""}
 - Tags / Requirements: ${(job.tags || []).join(", ") || "None"}
 - Job Description / Notes:
-${(job.description || job.notes || "No description provided").slice(0, 8000)}
+${(job.notes || "No description or notes provided").slice(0, 8000)}
 
 CURRENT RÉSUMÉ CONTENT TO TAILOR:
 Summary / Headline: "${summary}"

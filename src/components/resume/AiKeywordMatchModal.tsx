@@ -14,7 +14,6 @@ import {
 } from "../../lib/autoSettings";
 import {
   type AiMatchStepInfo,
-  type BulletDiff,
   type KeywordMatchResult,
   MATCH_STEP_LABELS,
   matchKeywordsToResume,
@@ -294,8 +293,8 @@ export default function AiKeywordMatchModal({
                                 type="button"
                                 onClick={() => handleProviderChange(prov.id)}
                                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${isSelected
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                                  ? "bg-indigo-600 text-white"
+                                  : "bg-slate-800 text-slate-400 hover:text-slate-200"
                                   }`}
                               >
                                 {prov.name}
@@ -378,8 +377,8 @@ export default function AiKeywordMatchModal({
                           }
                         }}
                         className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition ${stateFilters.size === 3
-                            ? "bg-indigo-600 text-white shadow-sm"
-                            : "border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200"
                           }`}
                       >
                         All
@@ -399,16 +398,16 @@ export default function AiKeywordMatchModal({
                               });
                             }}
                             className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium border transition ${isActive
-                                ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-200 shadow-sm"
-                                : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                              ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-200 shadow-sm"
+                              : "border-slate-800 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-300"
                               }`}
                           >
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${st === "InProgress"
-                                  ? "bg-amber-400"
-                                  : st === "NotApplied"
-                                    ? "bg-slate-400"
-                                    : "bg-emerald-400"
+                                ? "bg-amber-400"
+                                : st === "NotApplied"
+                                  ? "bg-slate-400"
+                                  : "bg-emerald-400"
                                 }`}
                             />
                             <span>{STATE_LABELS[st]}</span>
@@ -435,8 +434,8 @@ export default function AiKeywordMatchModal({
                               key={job.id}
                               onClick={() => setSelectedJobId(job.id)}
                               className={`cursor-pointer rounded-xl border p-3 transition flex items-center justify-between ${isSelected
-                                  ? "border-indigo-500 bg-indigo-500/10"
-                                  : "border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/60"
+                                ? "border-indigo-500 bg-indigo-500/10"
+                                : "border-slate-800/80 bg-slate-800/30 hover:border-slate-700 hover:bg-slate-800/60"
                                 }`}
                             >
                               <div className="min-w-0 flex-1">
@@ -464,8 +463,8 @@ export default function AiKeywordMatchModal({
                                 </span>
                                 <div
                                   className={`h-4 w-4 rounded-full border flex items-center justify-center ${isSelected
-                                      ? "border-indigo-500 bg-indigo-500 text-white"
-                                      : "border-slate-600"
+                                    ? "border-indigo-500 bg-indigo-500 text-white"
+                                    : "border-slate-600"
                                     }`}
                                 >
                                   {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
@@ -577,8 +576,8 @@ export default function AiKeywordMatchModal({
                           key={diff.id}
                           onClick={() => toggleDiff(diff.id)}
                           className={`cursor-pointer rounded-xl border p-3.5 space-y-2 transition ${isSelected
-                              ? "border-slate-700 bg-slate-950/80 shadow-sm"
-                              : "border-slate-800/60 bg-slate-950/30 opacity-60 hover:opacity-80"
+                            ? "border-slate-700 bg-slate-950/80 shadow-sm"
+                            : "border-slate-800/60 bg-slate-950/30 opacity-60 hover:opacity-80"
                             }`}
                         >
                           <div className="flex items-center justify-between text-[11px]">
@@ -609,8 +608,8 @@ export default function AiKeywordMatchModal({
                             </div>
                             <div
                               className={`rounded-lg border px-3 py-2 ${isSelected
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                  : "border-slate-700/40 bg-slate-800/30 text-slate-400 line-through"
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                : "border-slate-700/40 bg-slate-800/30 text-slate-400 line-through"
                                 }`}
                             >
                               <span className="font-bold mr-1.5 text-emerald-400">+</span>
@@ -643,7 +642,7 @@ export default function AiKeywordMatchModal({
                   disabled={!selectedJobId || jobs.length === 0}
                   className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-semibold text-white hover:bg-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                  <span>Match Keywords →</span>
+                  <span>Match Keywords</span>
                 </button>
               </>
             )}
