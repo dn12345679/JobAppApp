@@ -107,7 +107,7 @@ jobs:
         with:
           node-version: 22
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -136,7 +136,8 @@ jobs:
           cp -r src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
           MANIFEST=$(find src-tauri/gen/android -name AndroidManifest.xml | head -1)
           if [ -n "$MANIFEST" ]; then
-            sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/ic_launcher" android:roundIcon="@mipmap\/ic_launcher_round"/' "$MANIFEST"
+            echo "Overriding $MANIFEST"
+            cp src-tauri/android-overrides/AndroidManifest.xml "$MANIFEST"
           fi
 
       - name: Build the APK
