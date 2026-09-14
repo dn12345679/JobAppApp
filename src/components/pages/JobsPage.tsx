@@ -27,7 +27,7 @@ import StagesModal from "../StagesModal";
 import { exportJobs, type ExportFormat } from "../../lib/export";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-type DateRange = "all" | "week" | "month" | "custom";
+type DateRange = "all" | "today" | "week" | "month" | "custom";
 type SortKey = "newest" | "deadline" | "company" | "updated";
 
 export default function JobsPage({
@@ -180,8 +180,6 @@ export default function JobsPage({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const cutoff = rangeCutoff(range, customFrom);
-    const to = range === "custom" && customTo ? new Date(customTo) : null;
 
     const result = jobs.filter((j) => {
       if (q) {
@@ -197,12 +195,8 @@ export default function JobsPage({
       }
       if (activeTags.length && !activeTags.every((t) => j.tags.includes(t)))
         return false;
-      if (range !== "all") {
-        if (!j.dateApplied) return false;
-        const d = new Date(j.dateApplied);
-        if (cutoff && d < cutoff) return false;
-        if (to && d > to) return false;
-      }
+      if (!jobMatchesDateRange(j, stateFilter, range, customFrom, customTo))
+        return false;
       return true;
     });
 
@@ -256,9 +250,17 @@ export default function JobsPage({
           Missed deadline
         </Chip>
         <span className="mx-1 h-4 w-px bg-slate-700" />
-        {(["all", "week", "month", "custom"] as DateRange[]).map((r) => (
+        {(["all", "today", "week", "month", "custom"] as DateRange[]).map((r) => (
           <Chip key={r} active={range === r} onClick={() => setRange(r)}>
-            {r === "all" ? "Any date" : r === "week" ? "Past week" : r === "month" ? "Past month" : "Custom"}
+            {r === "all"
+              ? "Any date"
+              : r === "today"
+              ? "Today"
+              : r === "week"
+              ? "Past week"
+              : r === "month"
+              ? "Past month"
+              : "Custom"}
           </Chip>
         ))}
         {range === "custom" && (
@@ -758,12 +760,98 @@ function Chip({
   );
 }
 
-function rangeCutoff(range: DateRange, customFrom: string): Date | null {
-  const now = new Date();
-  if (range === "week") return new Date(now.getTime() - 7 * 864e5);
-  if (range === "month") return new Date(now.getTime() - 30 * 864e5);
-  if (range === "custom" && customFrom) return new Date(customFrom);
-  return null;
+function parseLocalDate(str: string, boundary: "start" | "end" = "start"): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (m) {
+    return boundary === "start"
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+      : new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+  }
+  return new Date(str);
+}
+
+function jobMatchesDateRange(
+  job: JobApplication,
+  stateFilter: ApplicationState | "all" | "missed",
+  range: DateRange,
+  customFrom: string,
+  customTo: string,
+  now: Date = new Date(),
+): boolean {
+  if (range === "all") return true;
+
+  // 1. Determine candidate date strings for this job based on selected stateFilter
+  const candidateDateStrings: string[] = [];
+
+  const effectiveState =
+    stateFilter === "all"
+      ? isMissedDeadline(job)
+        ? "missed"
+        : job.state
+      : stateFilter;
+
+  switch (effectiveState) {
+    case "Applied":
+      if (job.dateApplied) candidateDateStrings.push(job.dateApplied);
+      else if (job.updatedAt) candidateDateStrings.push(job.updatedAt);
+      else if (job.createdAt) candidateDateStrings.push(job.createdAt);
+      break;
+
+    case "missed":
+      if (job.deadline) candidateDateStrings.push(job.deadline);
+      break;
+
+    case "InProgress":
+      if (job.lastUpdate) candidateDateStrings.push(job.lastUpdate);
+      if (job.updatedAt) candidateDateStrings.push(job.updatedAt);
+      if (job.nextInterviewDate) candidateDateStrings.push(job.nextInterviewDate);
+      if (job.dateApplied) candidateDateStrings.push(job.dateApplied);
+      if (job.createdAt) candidateDateStrings.push(job.createdAt);
+      break;
+
+    case "NotApplied":
+      if (job.deadline) candidateDateStrings.push(job.deadline);
+      if (job.createdAt) candidateDateStrings.push(job.createdAt);
+      if (job.updatedAt) candidateDateStrings.push(job.updatedAt);
+      break;
+
+    default:
+      if (job.dateApplied) candidateDateStrings.push(job.dateApplied);
+      if (job.deadline) candidateDateStrings.push(job.deadline);
+      if (job.updatedAt) candidateDateStrings.push(job.updatedAt);
+      if (job.createdAt) candidateDateStrings.push(job.createdAt);
+      break;
+  }
+
+  if (candidateDateStrings.length === 0) return false;
+
+  // 2. Compute range bounds in local time
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+
+  if (range === "today") {
+    minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  } else if (range === "week") {
+    minDate = new Date(now.getTime() - 7 * 864e5);
+    maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  } else if (range === "month") {
+    minDate = new Date(now.getTime() - 30 * 864e5);
+    maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  } else if (range === "custom") {
+    if (customFrom) minDate = parseLocalDate(customFrom, "start");
+    if (customTo) maxDate = parseLocalDate(customTo, "end");
+  }
+
+  // 3. Check if at least one candidate date falls within [minDate, maxDate]
+  return candidateDateStrings.some((dStr) => {
+    if (!dStr) return false;
+    const d = parseLocalDate(dStr, "start");
+    if (isNaN(d.getTime())) return false;
+    if (minDate && d < minDate) return false;
+    if (maxDate && d > maxDate) return false;
+    return true;
+  });
 }
 
 function cmpNullableDate(a: string | null, b: string | null): number {

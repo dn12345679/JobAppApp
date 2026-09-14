@@ -131,7 +131,9 @@ jobs:
           if [ -z "$MA" ]; then echo "MainActivity.kt not found"; exit 1; fi
           echo "Overriding $MA"
           cp src-tauri/android-overrides/MainActivity.kt "$MA"
-          cat "$MA"
+          echo "Removing stale template drawables"
+          rm -f src-tauri/gen/android/app/src/main/res/drawable/ic_launcher_background.xml
+          rm -f src-tauri/gen/android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
           echo "Copying custom Android app icons into gen/android"
           cp -r src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
           MANIFEST=$(find src-tauri/gen/android -name AndroidManifest.xml | head -1)
