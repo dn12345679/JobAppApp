@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../auth/AuthContext";
-import { THEMES, applyTheme, getSavedTheme } from "../lib/theme";
+import { THEMES, getSavedTheme } from "../lib/theme";
 import { checkForUpdate } from "../lib/updater";
+
+const ThemeModal = lazy(() => import("./ThemeModal"));
 
 export default function AccountMenu({
   zoom,
@@ -17,9 +19,12 @@ export default function AccountMenu({
 }) {
   const { user, signOut } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const [theme, setTheme] = useState(getSavedTheme());
   const [checking, setChecking] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+
+  const currentThemeDef = THEMES.find((t) => t.id === theme) || THEMES[0];
 
   async function runUpdateCheck() {
     setChecking(true);
@@ -28,14 +33,10 @@ export default function AccountMenu({
     setChecking(false);
     if (r.kind === "uptodate") setUpdateMsg("You’re on the latest version.");
     else if (r.kind === "declined") setUpdateMsg(`Update ${r.version} is available.`);
-    else if (r.kind === "error") setUpdateMsg("Couldn’t check — try again later.");
+    else if (r.kind === "error") setUpdateMsg("Couldn’t check, try again later.");
     // "installing" → the app relaunches, so no message needed.
   }
 
-  function pickTheme(id: string) {
-    applyTheme(id);
-    setTheme(id);
-  }
 
   return (
     // z-40: above the résumé File/Edit band (z-30) but below modal backdrops (z-50).
@@ -100,29 +101,27 @@ export default function AccountMenu({
                 </div>
               </div>
 
-              {/* Theme */}
-              <div className="px-1 py-1.5">
-                <div className="mb-1.5 text-sm text-slate-300">Theme</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {THEMES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => pickTheme(t.id)}
-                      title={t.label}
-                      className={`flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs ${
-                        t.id === theme
-                          ? "border-indigo-500 text-slate-100"
-                          : "border-slate-700 text-slate-400 hover:text-slate-200"
-                      }`}
-                    >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ background: t.swatch }}
-                      />
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
+              {/* Theme & Appearance */}
+              <div className="px-1 py-1">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowThemeModal(true);
+                  }}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full border border-black/20"
+                      style={{ background: currentThemeDef.swatch }}
+                    />
+                    <span>Theme & Appearance</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span>{currentThemeDef.label}</span>
+                    <span className="text-slate-500">›</span>
+                  </span>
+                </button>
               </div>
 
               <div className="my-1 border-t border-slate-700" />
@@ -155,6 +154,18 @@ export default function AccountMenu({
               )}
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showThemeModal && (
+          <Suspense fallback={null}>
+            <ThemeModal
+              currentTheme={theme}
+              onThemeChange={(newTheme) => setTheme(newTheme)}
+              onClose={() => setShowThemeModal(false)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
     </div>

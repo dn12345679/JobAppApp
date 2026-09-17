@@ -2239,7 +2239,7 @@ dependencies = [
 
 [[package]]
 name = "job-tracker"
-version = "1.4.1"
+version = "1.5.0"
 dependencies = [
  "serde",
  "serde_json",

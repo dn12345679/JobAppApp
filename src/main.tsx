@@ -4,10 +4,17 @@ import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { applyTheme, getSavedTheme } from "./lib/theme";
 import "./index.css";
-import "./themes.css";
 
 // Apply the saved theme before first paint to avoid a flash.
-applyTheme(getSavedTheme());
+applyTheme(getSavedTheme(), false);
+
+// Only load background module if a custom wallpaper is actually saved
+const savedBg = localStorage.getItem("ui-background");
+if (savedBg && savedBg !== "none") {
+  import("./lib/background").then(({ applyBackground }) => {
+    applyBackground(savedBg, false);
+  });
+}
 
 // Belt-and-suspenders for disabling pinch-zoom on Android WebViews that ignore
 // the viewport's user-scalable=no (index.html). The app has no two-finger

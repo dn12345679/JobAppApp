@@ -12,6 +12,47 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Job Tracker</title>
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('ui-theme') || 'midnight';
+          if (t && t !== 'midnight') {
+            document.documentElement.setAttribute('data-theme', t);
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      :root[data-theme="light"],
+      :root[data-theme="butter"],
+      :root[data-theme="sakura"],
+      :root[data-theme="aero"] {
+        color-scheme: light;
+      }
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        background-color: #0b1120;
+        color: #f1f5f9;
+        font-family: Inter, system-ui, -apple-system, sans-serif;
+      }
+      #root {
+        margin: 0;
+        height: 100%;
+        background-color: transparent;
+      }
+      html[data-theme="ocean"], html[data-theme="ocean"] body { background-color: #071820; color: #edf8fc; }
+      html[data-theme="plum"], html[data-theme="plum"] body { background-color: #160f1f; color: #f5eefb; }
+      html[data-theme="light"], html[data-theme="light"] body { background-color: #eef2f7; color: #0f172a; }
+      html[data-theme="butter"], html[data-theme="butter"] body { background-color: #ffefc4; color: #433c1b; }
+      html[data-theme="sakura"], html[data-theme="sakura"] body { background-color: #fdf1f5; color: #45262f; }
+      html[data-theme="aero"], html[data-theme="aero"] body { background-color: #bfe3f8; color: #0e3350; }
+
+    </style>
   </head>
 
   <body>

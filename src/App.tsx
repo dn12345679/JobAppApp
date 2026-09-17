@@ -266,7 +266,10 @@ export default function App() {
   if (configured && authLoading) {
     return (
       <div className="flex h-full items-center justify-center text-slate-400">
-        Loading…
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+          <span className="text-xs font-medium tracking-wide">Loading…</span>
+        </div>
       </div>
     );
   }
@@ -280,7 +283,10 @@ export default function App() {
   if (!ready) {
     return (
       <div className="flex h-full items-center justify-center text-slate-400">
-        Loading…
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-indigo-500" />
+          <span className="text-xs font-medium tracking-wide">Loading…</span>
+        </div>
       </div>
     );
   }
@@ -412,7 +418,7 @@ export default function App() {
           (the bottom bar covers those), but shown for Tools so its sub-tabs
           (Résumé / Cover Letter / Notes) remain reachable. */}
       <nav
-        className={`gap-1 border-b border-slate-800 px-4 ${
+        className={`gap-1 border-b border-slate-800 bg-slate-900/40 backdrop-blur-xs px-4 ${
           mode === "tools" ? "flex" : "hidden md:flex"
         }`}
       >

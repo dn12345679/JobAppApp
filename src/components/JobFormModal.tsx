@@ -77,6 +77,7 @@ export default function JobFormModal({
   const canSave = company.trim() && title.trim();
 
   const [highlightDate, setHighlightDate] = useState(false); // animation trigger for autofilling field
+  const [highlightEndDate, setHighlightEndDate] = useState(false);
 
   useEffect(() => {
     if (state === "Applied" && stage !== "" && !dateApplied) {
@@ -85,6 +86,23 @@ export default function JobFormModal({
       setDateApplied(today);
       setHighlightDate(true);
       const t = setTimeout(() => setHighlightDate(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [state, stage]);
+
+  useEffect(() => {
+    const lower = stage.trim().toLowerCase();
+    const isDecisionStage =
+      lower.includes("rejected") ||
+      lower.includes("accepted") ||
+      lower.includes("declined");
+
+    if (state === "Applied" && isDecisionStage && !endDate) {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      setEndDate(today);
+      setHighlightEndDate(true);
+      const t = setTimeout(() => setHighlightEndDate(false), 1200);
       return () => clearTimeout(t);
     }
   }, [state, stage]);
@@ -302,7 +320,17 @@ export default function JobFormModal({
               <input type="date" value={nextInterviewDate} onChange={(e) => setNextInterviewDate(e.target.value)} className={inputCls} />
             </Field>
             <Field label="Decision date">
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+              <motion.div
+                animate={
+                  highlightEndDate
+                    ? { boxShadow: "0 0 0 2px #6366f1, 0 0 14px 2px rgba(99, 102, 241, 0.5)" }
+                    : { boxShadow: "0 0 0 0px transparent" }
+                }
+                transition={{ duration: 0.3 }}
+                className="rounded-lg"
+              >
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+              </motion.div>
             </Field>
           </div>
 

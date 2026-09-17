@@ -1,3 +1,4 @@
+@import "./themes.css";
 @import "tailwindcss";
 
 /* Theme system ------------------------------------------------------------
@@ -40,6 +41,11 @@
   --color-teal-300: var(--teal-300);
 }
 
+html {
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
 html,
 body,
 #root {
@@ -62,16 +68,50 @@ body,
 
 body {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   /* App-like touch behavior: no double-tap zoom, no pull-to-refresh/overscroll
      bounce. Pinch zoom is disabled via the viewport meta (index.html). */
   touch-action: manipulation;
   overscroll-behavior: none;
+}
+
+/* Smooth theme transition interpolation: eliminates repainting jitter when switching themes */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
   transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+    background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
+    color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0s !important;
+}
+
+/* Custom background image active override: applies wallpaper without breaking background-color */
+:root[data-has-bg-image] body {
+  background-image: var(--bg-image) !important;
+  background-position: center !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+  background-repeat: no-repeat !important;
+}
+
+/* Scrim overlay: softens high-contrast photos and guarantees text readability with instant rendering */
+:root[data-has-bg-image] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
 }
 
 * {

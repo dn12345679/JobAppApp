@@ -49,6 +49,7 @@ export default function JobsPage({
   const [range, setRange] = useState<DateRange>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [activeStages, setActiveStages] = useState<string[]>([]);
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [hideMissed, setHideMissed] = useState(false);
   const [sort, setSort] = useState<SortKey>("newest");
@@ -173,6 +174,24 @@ export default function JobsPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId, refreshKey]);
 
+  const allStages = useMemo(() => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+    for (const s of stages) {
+      if (!seen.has(s.label)) {
+        seen.add(s.label);
+        list.push(s.label);
+      }
+    }
+    for (const j of jobs) {
+      if (j.stage && !seen.has(j.stage)) {
+        seen.add(j.stage);
+        list.push(j.stage);
+      }
+    }
+    return list;
+  }, [stages, jobs]);
+
   const allTags = useMemo(
     () => [...new Set(jobs.flatMap((j) => j.tags))].sort(),
     [jobs],
@@ -193,6 +212,8 @@ export default function JobsPage({
       } else if (hideMissed && isMissedDeadline(j)) {
         return false;
       }
+      if (activeStages.length && (!j.stage || !activeStages.includes(j.stage)))
+        return false;
       if (activeTags.length && !activeTags.every((t) => j.tags.includes(t)))
         return false;
       if (!jobMatchesDateRange(j, stateFilter, range, customFrom, customTo))
@@ -213,7 +234,7 @@ export default function JobsPage({
       }
     });
     return result;
-  }, [jobs, query, stateFilter, range, customFrom, customTo, activeTags, sort, hideMissed]);
+  }, [jobs, query, stateFilter, range, customFrom, customTo, activeStages, activeTags, sort, hideMissed]);
 
   async function doExport(format: ExportFormat) {
     setShowExport(false);
@@ -229,6 +250,7 @@ export default function JobsPage({
     (stateFilter !== "all" ? 1 : 0) +
     (range !== "all" ? 1 : 0) +
     (hideMissed ? 1 : 0) +
+    activeStages.length +
     activeTags.length;
 
   // The full filter set, reused inline on desktop and inside the mobile drawer.
@@ -275,6 +297,25 @@ export default function JobsPage({
           {hideMissed ? "✓ " : ""}Hide missed
         </Chip>
       </div>
+
+      {allStages.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-slate-500">Stage:</span>
+          {allStages.map((s) => (
+            <Chip
+              key={s}
+              active={activeStages.includes(s)}
+              onClick={() =>
+                setActiveStages((prev) =>
+                  prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
+                )
+              }
+            >
+              {s}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       {allTags.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
@@ -750,9 +791,9 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-2.5 py-1 font-medium transition ${active
-          ? "border-indigo-500 bg-indigo-500/15 text-indigo-200"
-          : "border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+      className={`rounded-full border px-2.5 py-1 font-medium transition backdrop-blur-xs ${active
+          ? "border-indigo-500 bg-indigo-500/25 text-indigo-200 shadow-xs"
+          : "border-slate-700/80 bg-slate-800/60 text-slate-300 hover:border-slate-600 hover:bg-slate-800/90 hover:text-slate-100"
         }`}
     >
       {children}

@@ -73,7 +73,7 @@ export default function SignInPage() {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && verify()}
-            placeholder="123456"
+            placeholder="12345678"
             className={`${inputCls} text-center text-lg tracking-[0.5em]`}
           />
         )}
