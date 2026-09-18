@@ -16,7 +16,7 @@ import {
   softDeleteResume,
 } from "../../lib/db";
 import { exportResumeToFile, importResumeFromFile } from "../../lib/resumeIO";
-import { exportToPdf } from "../../lib/exportPdf";
+import { exportToPdf, buildExportFileName } from "../../lib/exportPdf";
 import ProfileEditor from "../resume/ProfileEditor";
 import ResumePreview from "../resume/ResumePreview";
 import ResumeMenuBar from "../resume/ResumeMenuBar";
@@ -24,7 +24,6 @@ import ResumeManagerModal from "../resume/ResumeManagerModal";
 import FindReplaceModal from "../resume/FindReplaceModal";
 import ImportPreviewModal from "../resume/ImportPreviewModal";
 import TemplateGallery from "../resume/TemplateGallery";
-import AiKeywordMatchModal from "../resume/AiKeywordMatchModal";
 
 // The Tools › Résumé screen. A user can keep several named résumés; this page
 // owns the active-document state plus the Word-style menu bar (File/Edit), the
@@ -45,7 +44,6 @@ export default function ResumePage({
   const [savedAt, setSavedAt] = useState<"idle" | "saving" | "saved">("idle");
   const [manager, setManager] = useState(false);
   const [findReplace, setFindReplace] = useState(false);
-  const [keywordMatch, setKeywordMatch] = useState(false);
   const [copyPicker, setCopyPicker] = useState(false);
   const [importCandidate, setImportCandidate] = useState<ResumeProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -295,10 +293,16 @@ export default function ResumePage({
         onOpenManager={() => setManager(true)}
         onImport={handleImport}
         onExportFile={handleExportFile}
-        onExportPdf={exportToPdf}
+        onExportPdf={() => {
+          const title = buildExportFileName(
+            "Resume",
+            profile?.contact?.fullName,
+            profile?.name,
+          );
+          exportToPdf(title);
+        }}
         onSettings={applySettings}
         onFindReplace={() => setFindReplace(true)}
-        onAiKeywordMatch={() => setKeywordMatch(true)}
       />
 
       {/* Mobile Edit / Preview switch (desktop shows both panes at once). */}
@@ -377,17 +381,6 @@ export default function ResumePage({
             profile={importCandidate}
             onConfirm={() => void confirmImport()}
             onCancel={() => setImportCandidate(null)}
-          />
-        )}
-        {keywordMatch && profile && (
-          <AiKeywordMatchModal
-            profile={profile}
-            workspaceId={activeWorkspaceId}
-            onApply={(next) => {
-              update(next);
-              setEditorEpoch((e) => e + 1);
-            }}
-            onClose={() => setKeywordMatch(false)}
           />
         )}
       </AnimatePresence>

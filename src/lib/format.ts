@@ -41,3 +41,30 @@ export function fmtPay(job: JobApplication): string | null {
   else if (job.payMax != null) base = `up to ${usd(job.payMax)}`;
   return base ? `${base}${per}` : null;
 }
+
+/**
+ * Builds export file names matching:
+ * Resume_<content in full name separated by underscores>_<MMDDYY>
+ * CoverLetter_<content in full name separated by underscores>_<MMDDYY>
+ */
+export function buildExportFileName(
+  prefix: "Resume" | "CoverLetter",
+  fullName?: string | null,
+  fallbackName?: string | null,
+  date: Date = new Date(),
+): string {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const yy = String(date.getFullYear()).slice(-2);
+  const dateSuffix = `${mm}${dd}${yy}`;
+
+  const raw = (fullName && fullName.trim()) || (fallbackName && fallbackName.trim()) || "Untitled";
+  const safe = raw
+    .replace(/[\\/:*?"<>|,.]+/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+
+  const namePart = safe || "Untitled";
+  return `${prefix}_${namePart}_${dateSuffix}`;
+}
+

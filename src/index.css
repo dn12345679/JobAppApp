@@ -138,10 +138,21 @@ html.theme-transitioning *::after {
     size: letter;
     margin: 0;
   }
+  :root {
+    color-scheme: light !important;
+  }
   html,
   body {
-    height: auto;
-    background: #fff;
+    height: auto !important;
+    background: #fff !important;
+    color: #111827 !important;
+    color-scheme: light !important;
+  }
+  body::before,
+  body::after {
+    display: none !important;
+    content: none !important;
+    background: none !important;
   }
   #root {
     display: none !important;
@@ -149,6 +160,10 @@ html.theme-transitioning *::after {
   #resume-print,
   #coverletter-print {
     display: block !important;
+    position: relative !important;
+    z-index: 9999 !important;
+    background: #fff !important;
+    color: #111827 !important;
   }
 }
 
