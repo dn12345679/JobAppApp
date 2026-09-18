@@ -82,25 +82,22 @@ export function applyBackground(id: string, animate = false): void {
     root.classList.add("theme-transitioning");
   }
 
+  // Clear any legacy inline styles on body to prevent root canvas compositing interference
+  document.body.style.removeProperty("background-image");
+  document.body.style.removeProperty("background-size");
+  document.body.style.removeProperty("background-position");
+  document.body.style.removeProperty("background-attachment");
+  document.body.style.removeProperty("background-repeat");
+
   if (!bg || !bg.url || id === "none") {
     // Revert to the default theme solid background
     root.removeAttribute("data-has-bg-image");
     root.style.removeProperty("--bg-image");
-    document.body.style.removeProperty("background-image");
-    document.body.style.removeProperty("background-size");
-    document.body.style.removeProperty("background-position");
-    document.body.style.removeProperty("background-attachment");
-    document.body.style.removeProperty("background-repeat");
     localStorage.setItem(KEY, "none");
   } else {
-    // Enable custom background wallpaper without destroying the --bg color token
+    // Enable custom background wallpaper layer
     root.setAttribute("data-has-bg-image", "true");
     root.style.setProperty("--bg-image", `url("${bg.url}")`);
-    document.body.style.backgroundImage = `url("${bg.url}")`;
-    document.body.style.backgroundSize = "cover";
-    document.body.style.backgroundPosition = "center";
-    document.body.style.backgroundAttachment = "fixed";
-    document.body.style.backgroundRepeat = "no-repeat";
     localStorage.setItem(KEY, id);
   }
 

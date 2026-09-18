@@ -54,7 +54,7 @@ export default function CreateWorkspaceModal({
 
       if (canShare && pending.length) {
         // Push the workspace + owner membership so invites can attach to it.
-        await syncAll();
+        await syncAll(ownerId);
         const failures: string[] = [];
         for (const inv of pending) {
           try {

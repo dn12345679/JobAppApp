@@ -164,7 +164,7 @@ export default function App() {
 
         // Pull first.
         try {
-          await syncAll();
+          await syncAll(user.id);
         } catch (e) {
           setSyncMsg(
             `Sync error: ${e instanceof Error ? e.message : String(e)}`,
@@ -176,7 +176,7 @@ export default function App() {
         if (all.length === 0) {
           await createWorkspace("My Applications", user.id);
           try {
-            await syncAll();
+            await syncAll(user.id);
           } catch {
             /* offline: keep the local seed until next sync */
           }
@@ -184,7 +184,7 @@ export default function App() {
         const merged = await dedupeWorkspaces();
         if (merged > 0) {
           try {
-            await syncAll(); // push the merge tombstones so the server is cleaned too
+            await syncAll(user.id); // push the merge tombstones so the server is cleaned too
           } catch {
             /* ignore */
           }
@@ -217,7 +217,7 @@ export default function App() {
     setSyncing(true);
     setSyncMsg(null);
     try {
-      const r = await syncAll();
+      const r = await syncAll(user.id);
       await reloadWorkspaces();
       setDataVersion((v) => v + 1);
       console.log("[sync] result", r);

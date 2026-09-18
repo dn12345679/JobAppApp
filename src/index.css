@@ -83,32 +83,37 @@ html.theme-transitioning *,
 html.theme-transitioning *::before,
 html.theme-transitioning *::after {
   transition:
-    background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
-    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
-    color 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important,
+    background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
     box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   transition-delay: 0s !important;
 }
 
-/* Custom background image active override: applies wallpaper without breaking background-color */
-:root[data-has-bg-image] body {
-  background-image: var(--bg-image) !important;
-  background-position: center !important;
-  background-size: cover !important;
-  background-attachment: fixed !important;
-  background-repeat: no-repeat !important;
+/* Custom background wallpaper layer with GPU-accelerated blur filter */
+:root[data-has-bg-image] body::before {
+  content: "";
+  position: fixed;
+  inset: -20px; /* Bleed outside viewport so blur edges do not vignette */
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--bg-image);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  filter: blur(8px);
+  -webkit-filter: blur(8px);
+  transform: translate3d(0, 0, 0);
 }
 
-/* Scrim overlay: softens high-contrast photos and provides focused backdrop blur for readability */
-:root[data-has-bg-image] body::before {
+/* Scrim overlay: softens high-contrast photos and guarantees text readability across themes */
+:root[data-has-bg-image] body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  backdrop-filter: blur(8px) saturate(120%);
-  -webkit-backdrop-filter: blur(8px) saturate(120%);
-  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 65%, transparent);
 }
 
 #root {

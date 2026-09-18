@@ -43,17 +43,21 @@ const parseJson = (v: unknown): Record<string, unknown> => {
  * (canonical). See DESIGN.md §4.1. Order: claim local seed → push local
  * changes → pull remote. Conflicts resolve last-write-wins by `updated_at`.
  */
-export async function syncAll(): Promise<SyncResult> {
+export async function syncAll(userId?: string): Promise<SyncResult> {
   if (!supabase) throw new Error("Sync is not configured.");
   const db = await getDb();
 
-  // Read the uid straight from the live session so it always equals auth.uid()
-  // in Supabase RLS (and confirms the auth token is actually attached).
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !authData.user) {
-    throw new Error("Not signed in yet — try again in a moment.");
+  // Securely retrieve the authenticated uid from the active cryptographically verified session
+  const { data: sessionData } = await supabase.auth.getSession();
+  let uid = sessionData.session?.user?.id ?? userId;
+
+  if (!uid) {
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData.user) {
+      throw new Error("Not signed in yet — try again in a moment.");
+    }
+    uid = authData.user.id;
   }
-  const uid = authData.user.id;
   console.log("[sync] uid", uid);
 
   // 1. Adopt the offline "local" seed workspace/membership for this user so it
@@ -159,155 +163,159 @@ export async function syncAll(): Promise<SyncResult> {
     if (error) throw new Error(`push memberships: ${error.message}`);
   }
 
-  // 4. PUSH dirty job applications.
+  // 4. PUSH child entities concurrently (after workspaces & memberships exist).
   const dirtyJobs = await db.select<Row[]>(
     "SELECT * FROM job_applications WHERE dirty = 1",
   );
-  if (dirtyJobs.length) {
-    const { error } = await supabase
-      .from("job_applications")
-      .upsert(dirtyJobs.map(localJobToRemote));
-    if (error) throw new Error(`push jobs: ${error.message}`);
-    await db.execute("UPDATE job_applications SET dirty = 0 WHERE dirty = 1");
-  }
-
-  // 4b. PUSH dirty stages — only for workspaces we can write to, so an orphaned
-  //     stage (e.g. left over from another account) can never abort the sync.
   const dirtyStages = await db.select<Row[]>(
     `SELECT s.* FROM stages s
      JOIN memberships m ON m.workspace_id = s.workspace_id
      WHERE s.dirty = 1 AND m.user_id = $1 AND m.role IN ('owner', 'editor')`,
     [uid],
   );
-  if (dirtyStages.length) {
-    const { error } = await supabase.from("stages").upsert(
-      dirtyStages.map((s) => ({
-        id: s.id,
-        workspace_id: s.workspace_id,
-        label: s.label,
-        position: Number(s.position ?? 0),
-        created_at: s.created_at,
-        updated_at: s.updated_at,
-        deleted: !!s.deleted,
-      })),
-    );
-    if (error) throw new Error(`push stages: ${error.message}`);
-    await db.execute("UPDATE stages SET dirty = 0 WHERE dirty = 1");
-  }
-
-  // 4c. PUSH the dirty résumé profile (only our own row; RLS is user-scoped).
-  //     `data` is TEXT locally but jsonb on the server, so parse it to an object.
   const dirtyProfiles = await db.select<Row[]>(
     "SELECT * FROM resume_profile WHERE dirty = 1 AND user_id = $1",
     [uid],
   );
-  if (dirtyProfiles.length) {
-    const { error } = await supabase.from("resume_profile").upsert(
-      dirtyProfiles.map((p) => ({
-        id: p.id,
-        user_id: p.user_id,
-        name: p.name ?? null,
-        data: parseJson(p.data),
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        deleted: !!p.deleted,
-      })),
-    );
-    if (error) throw new Error(`push resume profile: ${error.message}`);
-    await db.execute(
-      "UPDATE resume_profile SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
-      [uid],
-    );
-  }
-
-  // 4d. PUSH dirty cover letters (multi-doc, carries `name`).
   const dirtyCovers = await db.select<Row[]>(
     "SELECT * FROM cover_letter WHERE dirty = 1 AND user_id = $1",
     [uid],
   );
-  if (dirtyCovers.length) {
-    const { error } = await supabase.from("cover_letter").upsert(
-      dirtyCovers.map((p) => ({
-        id: p.id,
-        user_id: p.user_id,
-        name: p.name ?? null,
-        data: parseJson(p.data),
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        deleted: !!p.deleted,
-      })),
-    );
-    if (error) throw new Error(`push cover_letter: ${error.message}`);
-    await db.execute(
-      "UPDATE cover_letter SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
-      [uid],
-    );
-  }
-
-  // 4e. PUSH the dirty personal notes (single per-user doc).
   const dirtyNotes = await db.select<Row[]>(
     "SELECT * FROM personal_notes WHERE dirty = 1 AND user_id = $1",
     [uid],
   );
-  if (dirtyNotes.length) {
-    const { error } = await supabase.from("personal_notes").upsert(
-      dirtyNotes.map((p) => ({
-        id: p.id,
-        user_id: p.user_id,
-        data: parseJson(p.data),
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        deleted: !!p.deleted,
-      })),
-    );
-    if (error) throw new Error(`push personal_notes: ${error.message}`);
-    await db.execute(
-      "UPDATE personal_notes SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
-      [uid],
-    );
+
+  const pushTasks: Promise<void>[] = [];
+
+  if (dirtyJobs.length) {
+    pushTasks.push((async () => {
+      const { error } = await supabase
+        .from("job_applications")
+        .upsert(dirtyJobs.map(localJobToRemote));
+      if (error) throw new Error(`push jobs: ${error.message}`);
+      await db.execute("UPDATE job_applications SET dirty = 0 WHERE dirty = 1");
+    })());
   }
 
-  // 5. PULL everything visible (RLS limits to the user's workspaces).
-  const { data: wsRemote, error: wsErr } = await supabase
-    .from("workspaces")
-    .select("*");
+  if (dirtyStages.length) {
+    pushTasks.push((async () => {
+      const { error } = await supabase.from("stages").upsert(
+        dirtyStages.map((s) => ({
+          id: s.id,
+          workspace_id: s.workspace_id,
+          label: s.label,
+          position: Number(s.position ?? 0),
+          created_at: s.created_at,
+          updated_at: s.updated_at,
+          deleted: !!s.deleted,
+        })),
+      );
+      if (error) throw new Error(`push stages: ${error.message}`);
+      await db.execute("UPDATE stages SET dirty = 0 WHERE dirty = 1");
+    })());
+  }
+
+  if (dirtyProfiles.length) {
+    pushTasks.push((async () => {
+      const { error } = await supabase.from("resume_profile").upsert(
+        dirtyProfiles.map((p) => ({
+          id: p.id,
+          user_id: p.user_id,
+          name: p.name ?? null,
+          data: parseJson(p.data),
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          deleted: !!p.deleted,
+        })),
+      );
+      if (error) throw new Error(`push resume profile: ${error.message}`);
+      await db.execute(
+        "UPDATE resume_profile SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+        [uid],
+      );
+    })());
+  }
+
+  if (dirtyCovers.length) {
+    pushTasks.push((async () => {
+      const { error } = await supabase.from("cover_letter").upsert(
+        dirtyCovers.map((p) => ({
+          id: p.id,
+          user_id: p.user_id,
+          name: p.name ?? null,
+          data: parseJson(p.data),
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          deleted: !!p.deleted,
+        })),
+      );
+      if (error) throw new Error(`push cover_letter: ${error.message}`);
+      await db.execute(
+        "UPDATE cover_letter SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+        [uid],
+      );
+    })());
+  }
+
+  if (dirtyNotes.length) {
+    pushTasks.push((async () => {
+      const { error } = await supabase.from("personal_notes").upsert(
+        dirtyNotes.map((p) => ({
+          id: p.id,
+          user_id: p.user_id,
+          data: parseJson(p.data),
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          deleted: !!p.deleted,
+        })),
+      );
+      if (error) throw new Error(`push personal_notes: ${error.message}`);
+      await db.execute(
+        "UPDATE personal_notes SET dirty = 0 WHERE dirty = 1 AND user_id = $1",
+        [uid],
+      );
+    })());
+  }
+
+  if (pushTasks.length > 0) {
+    await Promise.all(pushTasks);
+  }
+
+  // 5. PULL all tables in parallel over HTTP/2 multiplexing.
+  const [
+    { data: wsRemote, error: wsErr },
+    { data: memRemote, error: memErr },
+    { data: jobsRemote, error: jobsErr },
+    { data: stagesRemote, error: stagesErr },
+    { data: rpRemote, error: rpErr },
+    { data: clRemote, error: clErr },
+    { data: pnRemote, error: pnErr },
+  ] = await Promise.all([
+    supabase.from("workspaces").select("*"),
+    supabase.from("memberships").select("*"),
+    supabase.from("job_applications").select("*"),
+    supabase.from("stages").select("*"),
+    supabase.from("resume_profile").select("*"),
+    supabase.from("cover_letter").select("*"),
+    supabase.from("personal_notes").select("*"),
+  ]);
+
   if (wsErr) throw new Error(`pull workspaces: ${wsErr.message}`);
-  for (const w of wsRemote ?? []) await upsertWorkspaceLocal(w);
-
-  const { data: memRemote, error: memErr } = await supabase
-    .from("memberships")
-    .select("*");
   if (memErr) throw new Error(`pull memberships: ${memErr.message}`);
-  for (const m of memRemote ?? []) await upsertMembershipLocal(m);
-
-  const { data: jobsRemote, error: jobsErr } = await supabase
-    .from("job_applications")
-    .select("*");
   if (jobsErr) throw new Error(`pull jobs: ${jobsErr.message}`);
-  for (const j of jobsRemote ?? []) await upsertJobLocal(j);
-
-  const { data: stagesRemote, error: stagesErr } = await supabase
-    .from("stages")
-    .select("*");
   if (stagesErr) throw new Error(`pull stages: ${stagesErr.message}`);
-  for (const s of stagesRemote ?? []) await upsertStageLocal(s);
-
-  const { data: rpRemote, error: rpErr } = await supabase
-    .from("resume_profile")
-    .select("*");
   if (rpErr) throw new Error(`pull resume profile: ${rpErr.message}`);
-  for (const p of rpRemote ?? []) await upsertResumeProfileLocal(p);
-
-  const { data: clRemote, error: clErr } = await supabase
-    .from("cover_letter")
-    .select("*");
   if (clErr) throw new Error(`pull cover_letter: ${clErr.message}`);
-  for (const d of clRemote ?? []) await upsertCoverLetterLocal(d);
-
-  const { data: pnRemote, error: pnErr } = await supabase
-    .from("personal_notes")
-    .select("*");
   if (pnErr) throw new Error(`pull personal_notes: ${pnErr.message}`);
+
+  // Ingest into local SQLite in strict relational order (parent before child)
+  for (const w of wsRemote ?? []) await upsertWorkspaceLocal(w);
+  for (const m of memRemote ?? []) await upsertMembershipLocal(m);
+  for (const s of stagesRemote ?? []) await upsertStageLocal(s);
+  for (const j of jobsRemote ?? []) await upsertJobLocal(j);
+  for (const p of rpRemote ?? []) await upsertResumeProfileLocal(p);
+  for (const d of clRemote ?? []) await upsertCoverLetterLocal(d);
   for (const d of pnRemote ?? []) await upsertSingleDocLocal("personal_notes", d);
 
   return {

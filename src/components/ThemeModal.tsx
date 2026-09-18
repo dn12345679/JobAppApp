@@ -310,9 +310,8 @@ export default function ThemeModal({
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                   className="flex flex-col flex-1 overflow-hidden"
                 >
-                  {/* Background Info Bar */}
-                  <div className="flex items-center justify-between px-6 pt-3.5 pb-2">
-
+                  {/* Background Info Bar & Blur Slider */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-6 pt-3.5 pb-2">
                     <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
                       <span>Active background:</span>
                       <span className="font-medium text-slate-200">
