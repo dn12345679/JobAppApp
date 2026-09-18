@@ -32,10 +32,8 @@ import TemplateGallery from "../resume/TemplateGallery";
 // (debounced) and mark the row dirty for the next sync (DESIGN.md §11).
 export default function ResumePage({
   userId,
-  activeWorkspaceId,
 }: {
   userId: string;
-  activeWorkspaceId?: string;
 }) {
   const [resumes, setResumes] = useState<ResumeProfile[]>([]);
   const [trashed, setTrashed] = useState<ResumeProfile[]>([]);

@@ -473,10 +473,7 @@ export default function App() {
               <CalendarPage workspaceId={activeWs} refreshKey={dataVersion} />
             )}
             {mode === "tools" && toolTab === "resume" && (
-              <ResumePage
-                userId={currentUserId}
-                activeWorkspaceId={activeWs ?? undefined}
-              />
+              <ResumePage userId={currentUserId} />
             )}
             {mode === "tools" && toolTab === "cover" && (
               <CoverLetterPage userId={currentUserId} />
